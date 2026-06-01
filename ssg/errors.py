@@ -74,6 +74,18 @@ class PageBuildError(SSGError):
 class SiteModelError(SSGError):
     stage = "site-model"
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str | Path | None = None,
+        line: int | None = None,
+        stage: str | None = None,
+        conflicting_urls: frozenset[str] | None = None,
+    ) -> None:
+        super().__init__(message, path=path, line=line, stage=stage)
+        self.conflicting_urls = conflicting_urls or frozenset()
+
 
 class TemplateRenderError(SSGError):
     stage = "render"
@@ -89,7 +101,3 @@ class OutputWriteError(SSGError):
 
 class AssetCopyError(SSGError):
     stage = "assets"
-
-
-class BuildError(SSGError):
-    stage = "build"

@@ -1,10 +1,9 @@
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 from .builder import SiteBuilder
 from .config import load_config
 from .errors import (
     AssetCopyError,
-    BuildError,
     CLIError,
     ConfigError,
     DiscoveryError,
@@ -32,7 +31,6 @@ from .models import (
 __all__ = [
     "__version__",
     "AssetCopyError",
-    "BuildError",
     "BuildManifest",
     "BuildResult",
     "CLIError",

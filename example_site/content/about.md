@@ -2,6 +2,8 @@
 title: About
 layout: page.html
 draft: false
+description: About this demo static site.
+author: Example Author
 ---
 
 # About

@@ -35,9 +35,7 @@ def test_pipeline_includes_drafts_when_requested(site_root):
 def test_pipeline_drafts_appear_in_tag_pages_when_included(site_root):
     SiteBuilder(site_root / "site.toml", include_drafts=True).build()
 
-    python_tag = (site_root / "dist" / "tags" / "python" / "index.html").read_text(
-        encoding="utf-8"
-    )
+    python_tag = (site_root / "dist" / "tags" / "python" / "index.html").read_text(encoding="utf-8")
     assert "/blog/draft/" in python_tag
     assert "/blog/first/" in python_tag
 
@@ -55,7 +53,8 @@ def test_pipeline_reports_failed_pages(site_root):
 
     result = SiteBuilder(site_root / "site.toml", continue_on_error=True).build()
 
-    assert result.manifest.pages_failed == 1
+    assert result.manifest.pages_failed == 0
+    assert len(result.manifest.errors) >= 1
     assert any("broken.md" in error for error in result.manifest.errors)
 
 
@@ -128,3 +127,62 @@ def test_pipeline_warns_when_static_dir_missing(site_root):
     result = SiteBuilder(site_root / "site.toml").build()
 
     assert any("static directory not found" in warning for warning in result.manifest.warnings)
+
+
+def test_pipeline_continue_on_error_survives_duplicate_url(site_root):
+    (site_root / "content" / "collision.md").write_text(
+        "---\ntitle: Collision\nslug: about\nlayout: page.html\ndraft: false\n---\n# x\n",
+        encoding="utf-8",
+    )
+
+    result = SiteBuilder(site_root / "site.toml", continue_on_error=True).build()
+
+    assert result.manifest.pages_failed >= 1
+    assert any("duplicate URL" in error for error in result.manifest.errors)
+    assert (site_root / "dist" / "index.html").exists()
+    assert result.manifest.generated_pages >= 3
+    assert (site_root / "dist" / "tags" / "python" / "index.html").exists()
+
+
+def test_pipeline_warns_when_partial_dir_missing(site_root):
+    import shutil
+
+    shutil.rmtree(site_root / "partials")
+    result = SiteBuilder(site_root / "site.toml").build()
+
+    assert any("partial directory not found" in warning for warning in result.manifest.warnings)
+
+
+def test_pipeline_continue_on_error_survives_asset_copy_failure(site_root, monkeypatch):
+    from ssg.errors import AssetCopyError
+
+    def fail_copy(_config):
+        raise AssetCopyError("disk full", path=site_root / "static")
+
+    monkeypatch.setattr("ssg.builder.copy_assets", fail_copy)
+
+    result = SiteBuilder(site_root / "site.toml", continue_on_error=True).build()
+
+    assert result.manifest.pages_failed == 0
+    assert any("disk full" in error for error in result.manifest.errors)
+    assert (site_root / "dist" / "index.html").exists()
+
+
+def test_pipeline_manifest_omits_self_when_write_fails(site_root, monkeypatch):
+    import ssg.builder as builder_module
+
+    original = builder_module.write_manifest
+    calls = {"count": 0}
+
+    def flaky_write(config, manifest):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise OSError("manifest write failed")
+        return original(config, manifest)
+
+    monkeypatch.setattr(builder_module, "write_manifest", flaky_write)
+
+    result = SiteBuilder(site_root / "site.toml", continue_on_error=True).build()
+
+    assert any("manifest write failed" in error for error in result.manifest.errors)
+    assert ".ssg-manifest.json" not in result.manifest.output_files

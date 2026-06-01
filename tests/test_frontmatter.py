@@ -44,9 +44,7 @@ def test_frontmatter_reports_line_for_bad_boolean(site_root):
 
 def test_frontmatter_warns_on_unknown_field(site_root):
     path = site_root / "content" / "unknown.md"
-    path.write_text(
-        "---\ntitle: Page\nunknown_field: hello\n---\n# Page\n", encoding="utf-8"
-    )
+    path.write_text("---\ntitle: Page\nunknown_field: hello\n---\n# Page\n", encoding="utf-8")
 
     document = parse_document(source_for(path, site_root / "content"))
 
@@ -62,3 +60,13 @@ def test_frontmatter_unescapes_quoted_values(site_root):
     metadata = parse_metadata([r'title: "My Post: \"Special\" Edition"'], source, [])
 
     assert metadata["title"] == 'My Post: "Special" Edition'
+
+
+def test_frontmatter_unescapes_single_quoted_values(site_root):
+    from ssg.frontmatter import parse_metadata
+
+    path = site_root / "content" / "single.md"
+    source = source_for(path, site_root / "content")
+    metadata = parse_metadata(["title: 'It\\'s fine'"], source, [])
+
+    assert metadata["title"] == "It's fine"

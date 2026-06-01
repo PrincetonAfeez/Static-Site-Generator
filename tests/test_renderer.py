@@ -160,6 +160,59 @@ def test_renderer_exposes_nav_html(site_root):
     context = build_context(home, site, partials={})
 
     assert '<a href="/">Home</a>' in context["site"]["nav_html"]
+    assert context["site"]["nav_html"].startswith("<ul>")
+
+
+def test_renderer_exposes_draft_in_context(site_root):
+    config = load_config(site_root / "site.toml")
+    page = make_page(config)
+    page.draft = True
+    site = build_site_model(config, [page])
+    context = build_context(page, site, partials={})
+
+    assert context["page"]["draft"] is True
+
+
+def test_renderer_continue_on_error_skips_duplicate_partials(site_root):
+    config = load_config(site_root / "site.toml")
+    (config.partial_dir / "blog").mkdir()
+    (config.partial_dir / "blog" / "header.html").write_text("dup", encoding="utf-8")
+    site = build_site_model(config, [make_page(config)])
+    errors: list[str] = []
+
+    rendered = render_site(site, errors=errors)
+
+    assert rendered
+    assert any("duplicate partial" in error for error in errors)
+
+
+def test_renderer_nav_html_includes_nested_structure(site_root):
+    from ssg.builder import SiteBuilder
+
+    result = SiteBuilder(site_root / "site.toml").build()
+    home = next(page for page in result.site.pages if page.url == "/")
+    context = build_context(home, result.site, partials={})
+
+    nav_html = context["site"]["nav_html"]
+    assert "<ul>" in nav_html
+    assert "/blog/first/" in nav_html
+
+
+def test_renderer_rejects_circular_partial_references(site_root):
+    config = load_config(site_root / "site.toml")
+    (config.partial_dir / "loop_a.html").write_text(
+        "{{ site.partials.loop_b | safe }}", encoding="utf-8"
+    )
+    (config.partial_dir / "loop_b.html").write_text(
+        "{{ site.partials.loop_a | safe }}", encoding="utf-8"
+    )
+    (config.layout_dir / "page.html").write_text(
+        "{{ site.partials.loop_a | safe }}", encoding="utf-8"
+    )
+    site = build_site_model(config, [make_page(config)])
+
+    with pytest.raises(TemplateRenderError, match="did not stabilize"):
+        render_site(site)
 
 
 def test_partial_warning_catches_filter_syntax(site_root):

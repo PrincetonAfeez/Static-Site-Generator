@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
@@ -14,7 +15,9 @@ from ssg.page_builder import build_page, derive_url
 
 def build_page_from_path(path, root):
     config = load_config(root / "site.toml")
-    source = SourceFile(path=path, relative_path=path.relative_to(root / "content"), extension=path.suffix)
+    source = SourceFile(
+        path=path, relative_path=path.relative_to(root / "content"), extension=path.suffix
+    )
     document = parse_document(source)
     html = MarkdownConverter().convert(document.body_markdown)
     return build_page(document, html, config)
@@ -42,9 +45,7 @@ def test_derive_url_honors_custom_permalink():
     url = derive_url(Path("blog/post.md"), "post", permalink="/articles/{slug}/")
     assert url == "/articles/post/"
 
-    url = derive_url(
-        Path("blog/post.md"), "post", permalink="/{path}/{slug}/"
-    )
+    url = derive_url(Path("blog/post.md"), "post", permalink="/{path}/{slug}/")
     assert url == "/blog/post/"
 
 
@@ -99,8 +100,23 @@ def test_warn_collection_slug_collisions(site_root):
             extension=".md",
         )
         document = parse_document(source)
-        pages.append(build_page(document, MarkdownConverter().convert(document.body_markdown), config))
+        pages.append(
+            build_page(document, MarkdownConverter().convert(document.body_markdown), config)
+        )
 
     warn_collection_slug_collisions(pages, warnings)
 
     assert any("foo bar" in warning and "foo-bar" in warning for warning in warnings)
+
+
+@pytest.mark.parametrize(
+    ("relative", "slug", "permalink", "expected"),
+    [
+        (Path("index.md"), "index", "/{path}/{slug}/", "/"),
+        (Path("about.md"), "about", "/{path}/{slug}/", "/about/"),
+        (Path("blog/post.md"), "post", "/{slug}/", "/post/"),
+        (Path("docs/guide.md"), "guide", "/{path}/{slug}/", "/docs/guide/"),
+    ],
+)
+def test_derive_url_table(relative, slug, permalink, expected):
+    assert derive_url(relative, slug, permalink=permalink) == expected

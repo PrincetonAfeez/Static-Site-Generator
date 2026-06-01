@@ -35,7 +35,7 @@ def site_root(tmp_path: Path) -> Path:
     )
     (root / "layouts" / "page.html").write_text(
         (
-            "<html><head><link rel=\"stylesheet\" href=\"/{{ site.assets_dir }}/css/style.css\">"
+            '<html><head><link rel="stylesheet" href="/{{ site.assets_dir }}/css/style.css">'
             "</head><body>{{ site.partials.header | safe }}"
             "<main>{{ page.body | safe }}</main></body></html>"
         ),

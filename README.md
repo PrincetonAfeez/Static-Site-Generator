@@ -1,11 +1,24 @@
 # Static Site Generator
 
+[![tests](https://github.com/princ/static-site-generator/actions/workflows/test.yml/badge.svg)](https://github.com/princ/static-site-generator/actions/workflows/test.yml)
+
 A small Python static site generator that reads Markdown files with simple front
 matter, converts them to HTML, applies layouts through a template adapter, and
 writes static files to `dist/`.
 
 The project is a library plus CLI. There is no Django layer, HTMX layer,
 database, admin UI, or live rebuild server.
+
+## Demo in 60 seconds
+
+```powershell
+pip install -r requirements-dev.txt -e .
+python -m ssg build --config example_site/site.toml
+python -m ssg serve --config example_site/site.toml
+```
+
+Open `http://127.0.0.1:8000` — browse Home, About, blog posts, and tag pages.
+Build with `--drafts` to include `draft-post.md`.
 
 ## Installation
 
@@ -28,6 +41,22 @@ For a fully reproducible install, use the pinned versions in
 ```powershell
 pip install -r requirements.txt -r requirements-dev.txt -e .
 ```
+
+## Library API
+
+```python
+from ssg import SiteBuilder, load_config
+
+result = SiteBuilder("site.toml", continue_on_error=True).build()
+print(result.manifest.pages_rendered, result.config.output_dir)
+
+config = load_config("site.toml", include_drafts=True)
+```
+
+Key exports: `SiteBuilder`, `BuildResult`, `BuildManifest`, `SiteConfig`,
+`SiteModel`, `Page`, and the `SSGError` hierarchy. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Quick Start
 
@@ -79,7 +108,8 @@ Serve the built site locally (no rebuild on save):
 python -m ssg serve --config example_site/site.toml --host 127.0.0.1 --port 8000
 ```
 
-Print stage-level progress while building:
+Print stage-level progress while building (`--verbose` sets logging to INFO so
+pipeline messages such as `[build] discover` appear; default output hides them):
 
 ```powershell
 python -m ssg build --config example_site/site.toml --verbose
@@ -95,8 +125,8 @@ python -m ssg build --config example_site/site.toml --quiet
 
 | Code | Meaning                                                   |
 |------|-----------------------------------------------------------|
-| 0    | Success (no failed pages)                                 |
-| 1    | Build error — fatal `SSGError`, or partial failure when `--continue-on-error` left `pages_failed > 0` |
+| 0    | Success (no failed pages and no errors in the manifest) |
+| 1    | Build error — fatal `SSGError`, or `--continue-on-error` left `pages_failed > 0` or errors in the manifest |
 | 2    | CLI usage error (`CLIError` — bad path, missing dist, …)   |
 | 3    | Unexpected internal error                                  |
 
@@ -142,6 +172,12 @@ YAML. Supported fields are `title`, `date`, `tags`, `layout`, `draft`, `slug`,
 surface as build warnings — your templates can still read them via
 `{{ page.metadata.<field> }}`.
 
+Limitations:
+
+- One line per field (no multiline values)
+- `draft` accepts only `true` or `false` (not `yes`/`no`)
+- `tags` are normalized to lowercase and split on commas
+
 ## Templates
 
 Layouts live in `layouts/`. The fallback template adapter supports variable
@@ -163,11 +199,17 @@ rendered through the same template engine (so partials may reference
 `{{ site.title }}`, etc.). A missing partial reference renders as empty and
 is reported in the build warnings.
 
+Partial names are keyed by filename stem only (not subdirectory path), so
+`partials/header.html` and `partials/blog/header.html` cannot coexist.
+
 Supported syntax:
 
 - `{{ page.title }}` — escaped variable interpolation
 - `{{ page.body | safe }}` — raw HTML output
-- `{% if page.previous_url %}…{% endif %}` — conditional blocks (no `{% else %}`)
+- `{% if page.previous_url %}…{% endif %}` — conditional blocks (no `{% else %}`); booleans and numbers use normal truthiness (`false` and `0` are false)
+
+The only supported filter is `| safe`. Other filter names are treated as plain
+text and will not behave like Jinja filters.
 
 Not supported: loops, includes, nested conditionals (nested `{% if %}` raises an
 error), or a full template language.
@@ -175,7 +217,8 @@ error), or a full template language.
 List and dict values (such as `{{ page.tags }}`) render as an escaped Python
 repr, not as HTML lists. Use generated listing pages or pre-built HTML instead.
 
-Navigation HTML for top-level `site.nav` nodes is available as `{{ site.nav_html | safe }}`.
+Navigation HTML for the full `site.nav` tree (root-level and nested `<ul>` /
+`<li>` lists) is available as `{{ site.nav_html | safe }}`.
 In-page links use root-relative paths (`/about/`) so `ssg serve` works locally;
 `page.canonical_url` combines `site.base_url` with `page.url` for production
 canonical tags.
@@ -187,7 +230,7 @@ Every layout receives this context:
 `page`:
 - `title`, `url`, `slug`, `layout`, `collection`, `canonical_url`
 - `body` (HTML from the Markdown converter — use `| safe`)
-- `tags`, `date`, `previous_url`, `next_url`, `generated`
+- `tags`, `date`, `draft`, `previous_url`, `next_url`, `generated`
 - `metadata` (raw front matter, including unknown fields)
 
 `site`:
@@ -196,7 +239,7 @@ Every layout receives this context:
 - `tags` (`{tag_name: [pages]}`)
 - `collections` (`{collection_name: [pages]}`)
 - `nav` (tree of `{title, url, children}` nodes)
-- `nav_html` (pre-rendered top-level navigation links)
+- `nav_html` (pre-rendered navigation tree with nested lists)
 - `partials` (`{partial_name: html}` — pre-rendered partial files)
 
 ## Configuration
@@ -237,20 +280,45 @@ the build continues with a warning (empty partials or no copied assets).
 
 Each build writes `.ssg-manifest.json` to the output directory. The manifest
 includes `schema_version` (currently `1`), timing, page counts, warnings,
-errors, and a POSIX-formatted list of output files. The `pages_failed` counter
-reflects the number of distinct failed pages/inputs, not raw error strings.
+errors, and a POSIX-formatted list of output files. The manifest file itself is
+included in `output_files` only after a successful write. The `pages_failed`
+counter reflects distinct failed page URLs (not asset/manifest failures or raw
+error strings). Pre-page parse failures appear only in `errors`.
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Pipeline, modules, error recovery |
+| [EVALUATION.md](docs/EVALUATION.md) | Self-assessment, spec traceability, demo script |
+| [SECURITY.md](docs/SECURITY.md) | Threat model and HTML escaping |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Local setup and quality gate |
+| [ADR index](docs/adr/) | Architecture decision records |
+| [Project spec](docs/spec/static_site_generator_improved_full_scope.txt) | Canonical scope |
+
+This project implements the improved full scope spec; it deliberately does **not**
+implement incremental builds, RSS, sitemap generation, or a full YAML front matter parser.
 
 ## Development
 
-Static type checking runs on the `ssg/` package with mypy (`strict` mode is
-not enabled). Tests and lint run via:
+Static type checking runs on the `ssg/` package with **mypy strict mode**.
+Tests enforce **≥90% line coverage** on `ssg/`. Run the full gate:
+
+```powershell
+.\scripts\check.ps1
+```
+
+Or on Linux/macOS: `make check`. Individual steps:
 
 ```powershell
 pip install -r requirements-dev.txt -e .
 ruff check ssg tests
+ruff format --check ssg tests
 mypy ssg
-pytest
+pytest --cov=ssg --cov-fail-under=90
 ```
+
+CI runs the same checks on Ubuntu and Windows with Python 3.11, 3.12, and 3.13.
 
 ## Scope
 

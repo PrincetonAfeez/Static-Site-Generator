@@ -142,16 +142,12 @@ def _section(data: dict[str, Any], key: str, source_path: Path) -> dict[str, Any
     return value
 
 
-def _string_tuple(
-    value: Any, *, field_name: str, source_path: Path
-) -> tuple[str, ...]:
+def _string_tuple(value: Any, *, field_name: str, source_path: Path) -> tuple[str, ...]:
     if isinstance(value, str):
         return (value,)
     if isinstance(value, list):
         return tuple(str(item) for item in value)
-    raise ConfigError(
-        f"{field_name}: expected a string or list of strings", path=source_path
-    )
+    raise ConfigError(f"{field_name}: expected a string or list of strings", path=source_path)
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:

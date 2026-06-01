@@ -56,7 +56,7 @@ def scaffold_content(config: SiteConfig, relative_target: str, title: str | None
 def quote_frontmatter(value: str) -> str:
     if not value:
         return '""'
-    if any(char in value for char in ':\n\r"#\'') or value[0] in "- ":
+    if any(char in value for char in ":\n\r\"#'") or value[0] in "- ":
         escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{escaped}"'
     return value

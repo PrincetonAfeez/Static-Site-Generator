@@ -7,30 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Added
 
-- `site.nav_html` and `page.canonical_url` template context fields.
-- Iterative partial pre-rendering for nested partial references.
-- Explicit rejection of nested `{% if %}` blocks.
-- Collection directory slug-collision warnings.
-- `requirements-dev.txt` with pinned pytest, mypy, and ruff.
-- Ruff lint step in CI.
+- `docs/ARCHITECTURE.md`, `docs/EVALUATION.md`, `docs/SECURITY.md`, `CONTRIBUTING.md`.
+- Expanded ADRs with context, alternatives, and consequences.
+- `Makefile` and `scripts/check.ps1` for one-command quality gate.
+- pytest-cov with ≥90% coverage enforcement in CI and local checks.
+- Python 3.13 in CI matrix; ruff format check in CI.
+- Library API section in README; “Demo in 60 seconds” quick start.
+- Tests for scaffold errors, discovery failure, verbose logging, CLI exit code 3,
+  URL derivation table, HTML escaping without `| safe`, and `python -m ssg`.
+
+### Changed
+
+- mypy **strict mode** enabled for `ssg/`.
+- Version 0.3.0; example site content includes `description` and `author` fields.
+- README documentation index and coverage/type-check requirements.
+
+### Removed
+
+- Unused `BuildError` exception from public API and `errors.py`.
+
+## [0.2.1]
 
 ### Fixed
 
-- Front matter double-quoted escape sequences (`\"`, `\\`) parse correctly.
+- `{% if %}` blocks treat booleans and numbers with normal truthiness (`false` and `0` are false).
+- Manifest `output_files` lists `.ssg-manifest.json` only after a successful write.
+- `SiteModelError` fallback dedupes all pages before dropping generated pages.
+- `pages_failed` counts page URLs only; asset and manifest failures stay in `errors`.
+- Duplicate partial names no longer abort the whole build under `--continue-on-error`.
+- `SiteModelError` records conflicting page URLs for accurate failure tracking.
+- Root-level `nav_html` wraps items in `<ul>/<li>` for consistent markup.
+
+### Changed
+
+- `page.draft` exposed in template context.
+- Removed unused `BuildError` from the public API.
+- README documents front matter limits, partial stem namespace, `--verbose` logging,
+  manifest semantics, and links to `docs/`.
+- `example_site/site.toml` aligned with README (`assets_dir`, `[scaffold]`).
+
+### Added
+
+- Tests for bool/`0` conditionals, manifest/asset continue-on-error paths,
+  partial-dir warning, duplicate-partial recovery, and SiteModel dedupe fallback.
+
+## [0.2.0]
+
+### Added
+
+- `site.nav_html` and `page.canonical_url` template context fields.
+- Recursive `nav_html` rendering for nested navigation children.
+- Iterative partial pre-rendering for nested partial references.
+- Explicit rejection of nested `{% if %}` blocks and circular partial references.
+- Collection directory slug-collision warnings.
+- `requirements-dev.txt` with pinned pytest, mypy, and ruff.
+- Ruff lint step in CI.
+- Tests for site-model fallback, circular partials, serve smoke path, single-quoted
+  front matter, and list template escaping.
+
+### Fixed
+
+- Front matter double-quoted and single-quoted escape sequences parse correctly.
+- List/dict template values are HTML-escaped once (no double-escape on repr output).
+- Manifest `generated_pages` counts pages in the final site model after fallback.
 - Tag and collection generators share a single reserved-URL registry.
 - Generated pages validated for layout existence before render.
-- `--continue-on-error` survives `SiteModelError` by falling back to source pages.
+- `--continue-on-error` survives `SiteModelError`, asset copy failures, and
+  manifest write failures.
 - CLI summary reports `Build finished with errors.` when pages failed.
 - `pages_failed` manifest counter tracks distinct failed pages.
 - Example header uses generated `site.nav_html`; layouts emit canonical URLs.
 - Setuptools license metadata uses SPDX `MIT` format.
+- CI workflow triggers on the `main` branch.
 
 ### Changed
 
-- README pipeline, template, and development sections updated.
-- List/dict template values render as escaped repr strings.
+- README pipeline, template, and development sections updated (CI badge, filter docs).
+- List/dict template values render as escaped Python repr strings.
 
 ## [0.1.0]
 
@@ -57,4 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--version` flag, `__version__` attribute, and `py.typed` marker.
 - Listing HTML escapes page titles and URLs.
 
+[0.3.0]: https://github.com/princ/static-site-generator/releases/tag/v0.3.0
+[0.2.1]: https://github.com/princ/static-site-generator/releases/tag/v0.2.1
+[0.2.0]: https://github.com/princ/static-site-generator/releases/tag/v0.2.0
 [0.1.0]: https://github.com/princ/static-site-generator/releases/tag/v0.1.0

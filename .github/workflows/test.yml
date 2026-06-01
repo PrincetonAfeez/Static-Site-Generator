@@ -2,9 +2,9 @@ name: tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   test:
@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -31,10 +31,12 @@ jobs:
           pip install -e .
 
       - name: Run ruff
-        run: ruff check ssg tests
+        run: |
+          ruff check ssg tests
+          ruff format --check ssg tests
 
       - name: Run mypy
         run: mypy ssg
 
-      - name: Run pytest
-        run: pytest -v
+      - name: Run pytest with coverage
+        run: pytest --cov=ssg --cov-report=term-missing --cov-fail-under=90

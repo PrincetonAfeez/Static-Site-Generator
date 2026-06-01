@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "static-site-generator"
-version = "0.1.0"
+version = "0.3.0"
 description = "A small Python static site generator with a staged build pipeline."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Documentation",
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
@@ -29,6 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=8.0",
+    "pytest-cov>=6.0",
     "mypy>=1.0",
     "ruff>=0.14",
 ]
@@ -51,10 +53,18 @@ ssg = ["py.typed"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
+[tool.coverage.run]
+source = ["ssg"]
+branch = false
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
 [tool.mypy]
 python_version = "3.11"
 files = ["ssg"]
-strict = false
+strict = true
 warn_return_any = true
 warn_unused_ignores = true
 

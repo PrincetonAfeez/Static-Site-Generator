@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
+
+import pytest
+
 from ssg.config import load_config
 from ssg.discovery import discover_content
+from ssg.errors import DiscoveryError
 
 
 def test_discovery_finds_markdown_and_skips_hidden(site_root):
@@ -19,3 +24,11 @@ def test_discovery_finds_markdown_and_skips_hidden(site_root):
         "blog/first.md",
         "index.md",
     ]
+
+
+def test_discovery_raises_when_content_dir_missing(site_root):
+    config = load_config(site_root / "site.toml")
+    config = dataclasses.replace(config, content_dir=site_root / "gone")
+
+    with pytest.raises(DiscoveryError, match="content directory not found"):
+        discover_content(config)

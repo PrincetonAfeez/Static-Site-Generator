@@ -9,7 +9,13 @@ from time import perf_counter
 from .assets import copy_assets
 from .config import ensure_safe_output_dir, load_config
 from .discovery import discover_content
-from .errors import MarkdownConversionError, SiteModelError, SSGError
+from .errors import (
+    AssetCopyError,
+    MarkdownConversionError,
+    OutputWriteError,
+    SiteModelError,
+    SSGError,
+)
 from .frontmatter import parse_document
 from .manifest import write_manifest
 from .markdown_adapter import MarkdownConverter
@@ -24,7 +30,7 @@ from .models import (
 )
 from .page_builder import build_page, warn_collection_slug_collisions
 from .renderer import render_site, validate_page_layouts
-from .site_model import build_site_model, generate_derived_pages
+from .site_model import build_site_model, dedupe_pages_by_url, generate_derived_pages
 from .writer import clean_output_dir, write_pages
 
 logger = logging.getLogger("ssg.build")
@@ -70,7 +76,7 @@ class SiteBuilder:
         )
 
         self._log("filter/generate/site-model")
-        site, drafts_skipped, generated_count = self._assemble_site_model(
+        site, drafts_skipped = self._assemble_site_model(
             config, source_pages, warnings, errors, failed_page_keys
         )
 
@@ -78,6 +84,8 @@ class SiteBuilder:
         rendered_pages, output_files, asset_files = self._render_and_emit(
             config, site, errors, failed_page_keys
         )
+
+        generated_count = sum(1 for page in site.pages if page.generated)
 
         manifest = self._build_manifest(
             config=config,
@@ -95,7 +103,12 @@ class SiteBuilder:
         )
 
         self._log("manifest")
-        write_manifest(config, manifest)
+        manifest = self._write_manifest(config, manifest, errors, failed_page_keys)
+        manifest = dataclasses.replace(
+            manifest,
+            errors=list(errors),
+            pages_failed=len(failed_page_keys),
+        )
 
         return BuildResult(
             config=config,
@@ -112,9 +125,7 @@ class SiteBuilder:
             clean_output=self.clean_output,
         )
         if self.output_dir_override is not None:
-            config = dataclasses.replace(
-                config, output_dir=self.output_dir_override.resolve()
-            )
+            config = dataclasses.replace(config, output_dir=self.output_dir_override.resolve())
             ensure_safe_output_dir(config)
         return config
 
@@ -156,7 +167,7 @@ class SiteBuilder:
         warnings: list[str],
         errors: list[str],
         failed_page_keys: set[str],
-    ) -> tuple[SiteModel, int, int]:
+    ) -> tuple[SiteModel, int]:
         renderable_pages = [
             page for page in source_pages if config.include_drafts or not page.draft
         ]
@@ -165,9 +176,7 @@ class SiteBuilder:
             config, renderable_pages, errors, failed_page_keys
         )
         generated_pages = generate_derived_pages(config, renderable_pages, warnings)
-        generated_pages = self._validate_layouts(
-            config, generated_pages, errors, failed_page_keys
-        )
+        generated_pages = self._validate_layouts(config, generated_pages, errors, failed_page_keys)
         all_pages = renderable_pages + generated_pages
         try:
             site = build_site_model(config, all_pages, warnings=warnings)
@@ -175,8 +184,14 @@ class SiteBuilder:
             if not self.continue_on_error:
                 raise
             self._record_error(exc, errors, failed_page_keys)
-            site = build_site_model(config, renderable_pages, warnings=warnings)
-        return site, drafts_skipped, len(generated_pages)
+            try:
+                deduped = dedupe_pages_by_url(all_pages, warnings)
+                site = build_site_model(config, deduped, warnings=warnings)
+            except SiteModelError as retry_exc:
+                self._record_error(retry_exc, errors, failed_page_keys)
+                fallback_pages = dedupe_pages_by_url(renderable_pages, warnings)
+                site = build_site_model(config, fallback_pages, warnings=warnings)
+        return site, drafts_skipped
 
     def _validate_layouts(
         self,
@@ -204,9 +219,7 @@ class SiteBuilder:
         failed_page_keys: set[str],
     ) -> tuple[list[RenderedPage], list[Path], list[Path]]:
         if self.continue_on_error:
-            rendered_pages = render_site(
-                site, errors=errors, failed_page_keys=failed_page_keys
-            )
+            rendered_pages = render_site(site, errors=errors, failed_page_keys=failed_page_keys)
             output_files = write_pages(
                 config,
                 rendered_pages,
@@ -216,8 +229,46 @@ class SiteBuilder:
         else:
             rendered_pages = render_site(site)
             output_files = write_pages(config, rendered_pages)
-        asset_files = copy_assets(config)
+        try:
+            asset_files = copy_assets(config)
+        except AssetCopyError as exc:
+            if not self.continue_on_error:
+                raise
+            self._record_error(exc, errors, failed_page_keys, count_page_failure=False)
+            asset_files = []
         return rendered_pages, output_files, asset_files
+
+    def _write_manifest(
+        self,
+        config: SiteConfig,
+        manifest: BuildManifest,
+        errors: list[str],
+        failed_page_keys: set[str],
+    ) -> BuildManifest:
+        manifest_path = config.output_dir / ".ssg-manifest.json"
+        manifest_rel = manifest_path.relative_to(config.output_dir).as_posix()
+        try:
+            write_manifest(config, manifest)
+        except OSError as exc:
+            error = OutputWriteError(str(exc), path=manifest_path)
+            if not self.continue_on_error:
+                raise error from exc
+            self._record_error(error, errors, failed_page_keys, count_page_failure=False)
+            return manifest
+
+        final = dataclasses.replace(
+            manifest,
+            output_files=[*manifest.output_files, manifest_rel],
+        )
+        try:
+            write_manifest(config, final)
+        except OSError as exc:
+            error = OutputWriteError(str(exc), path=manifest_path)
+            if not self.continue_on_error:
+                raise error from exc
+            self._record_error(error, errors, failed_page_keys, count_page_failure=False)
+            return manifest
+        return final
 
     def _build_manifest(
         self,
@@ -236,14 +287,9 @@ class SiteBuilder:
         failed_page_keys: set[str],
     ) -> BuildManifest:
         finished = datetime.now(timezone.utc)
-        manifest_path = config.output_dir / ".ssg-manifest.json"
         output_file_names = [
-            path.relative_to(config.output_dir).as_posix()
-            for path in output_files + asset_files
+            path.relative_to(config.output_dir).as_posix() for path in output_files + asset_files
         ]
-        output_file_names.append(
-            manifest_path.relative_to(config.output_dir).as_posix()
-        )
 
         return BuildManifest(
             schema_version=1,
@@ -263,9 +309,7 @@ class SiteBuilder:
 
     def _warn_missing_optional_dirs(self, config: SiteConfig, warnings: list[str]) -> None:
         if not config.partial_dir.exists():
-            warnings.append(
-                f"[config] partial directory not found: {config.partial_dir}"
-            )
+            warnings.append(f"[config] partial directory not found: {config.partial_dir}")
         if not config.static_dir.exists():
             warnings.append(f"[config] static directory not found: {config.static_dir}")
 
@@ -276,15 +320,17 @@ class SiteBuilder:
         failed_page_keys: set[str],
         *,
         page: Page | None = None,
+        count_page_failure: bool = True,
     ) -> None:
         errors.append(str(exc))
+        if not count_page_failure:
+            return
         if page is not None:
             failed_page_keys.add(page.url)
             return
-        if exc.path is not None:
-            failed_page_keys.add(str(exc.path))
+        if isinstance(exc, SiteModelError) and exc.conflicting_urls:
+            failed_page_keys.update(exc.conflicting_urls)
             return
-        failed_page_keys.add(str(exc))
 
     def _converter_for(self, config: SiteConfig) -> MarkdownConverter:
         if self._converter is None:

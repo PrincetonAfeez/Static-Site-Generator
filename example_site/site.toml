@@ -5,9 +5,13 @@ layout_dir = "layouts"
 partial_dir = "partials"
 static_dir = "static"
 output_dir = "dist"
+assets_dir = "assets"
 default_layout = "page.html"
 permalink = "/{path}/{slug}/"
 
 [build]
 drafts = false
 clean = true
+
+[scaffold]
+post_collections = ["blog"]

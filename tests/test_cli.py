@@ -34,7 +34,19 @@ def test_cli_new_scaffolds_quoted_title(site_root):
 
 
 def test_cli_new_scaffolds_content_file(site_root):
-    assert main(["new", "blog/new-post", "--title", "New Post", "--config", str(site_root / "site.toml")]) == 0
+    assert (
+        main(
+            [
+                "new",
+                "blog/new-post",
+                "--title",
+                "New Post",
+                "--config",
+                str(site_root / "site.toml"),
+            ]
+        )
+        == 0
+    )
 
     created = site_root / "content" / "blog" / "new-post.md"
     assert created.exists()
@@ -47,9 +59,7 @@ def test_cli_new_scaffolds_content_file(site_root):
 
 def test_cli_new_uses_page_layout_for_non_post_collection(site_root):
     assert (
-        main(
-            ["new", "notes/idea", "--title", "Idea", "--config", str(site_root / "site.toml")]
-        )
+        main(["new", "notes/idea", "--title", "Idea", "--config", str(site_root / "site.toml")])
         == 0
     )
 
@@ -97,9 +107,7 @@ def test_cli_build_output_dir_override(site_root):
 
 
 def test_cli_build_quiet_suppresses_summary(site_root, capsys):
-    assert (
-        main(["build", "--config", str(site_root / "site.toml"), "--quiet"]) == 0
-    )
+    assert main(["build", "--config", str(site_root / "site.toml"), "--quiet"]) == 0
 
     captured = capsys.readouterr()
     assert "Built site successfully" not in captured.out
@@ -131,9 +139,7 @@ def test_cli_build_continue_on_error(site_root, capsys):
 def test_cli_build_drafts_negation(site_root):
     config_path = site_root / "site.toml"
     config_path.write_text(
-        config_path.read_text(encoding="utf-8").replace(
-            "drafts = false", "drafts = true"
-        ),
+        config_path.read_text(encoding="utf-8").replace("drafts = false", "drafts = true"),
         encoding="utf-8",
     )
 
@@ -153,9 +159,28 @@ def test_cli_build_drafts_negation(site_root):
 
 
 def test_cli_serve_errors_when_output_missing(site_root):
-    assert (
-        main(["serve", "--config", str(site_root / "site.toml")]) == 2
-    )
+    assert main(["serve", "--config", str(site_root / "site.toml")]) == 2
+
+
+def test_cli_serve_returns_zero_when_server_starts(site_root, monkeypatch):
+    from ssg.builder import SiteBuilder
+    import ssg.cli as cli_module
+
+    SiteBuilder(site_root / "site.toml").build()
+
+    class FakeServer:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def serve_forever(self) -> None:
+            pass
+
+        def server_close(self) -> None:
+            pass
+
+    monkeypatch.setattr(cli_module, "ThreadingHTTPServer", FakeServer)
+
+    assert cli_module.serve(str(site_root / "site.toml"), "127.0.0.1", 8765) == 0
 
 
 def test_cli_build_explicit_clean_overrides_config(site_root):
@@ -235,3 +260,19 @@ def test_cli_build_no_clean_with_output_dir(site_root):
 
     assert (target / "index.html").exists()
     assert sentinel.exists()
+
+
+def test_cli_build_verbose_prints_stage_logs(site_root, capsys):
+    assert main(["build", "--config", str(site_root / "site.toml"), "--verbose"]) == 0
+
+    captured = capsys.readouterr()
+    assert "[build] discover" in captured.err
+
+
+def test_cli_build_internal_error_returns_exit_code_three(site_root, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr("ssg.cli.SiteBuilder", boom)
+
+    assert main(["build", "--config", str(site_root / "site.toml")]) == 3

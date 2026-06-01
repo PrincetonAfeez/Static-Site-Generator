@@ -24,7 +24,7 @@ def test_template_safe_filter_preserves_html():
 
 def test_template_if_block_omits_false_branch():
     html = TemplateRenderer().render(
-        "{% if page.previous_url %}<a href=\"{{ page.previous_url }}\">Prev</a>{% endif %}",
+        '{% if page.previous_url %}<a href="{{ page.previous_url }}">Prev</a>{% endif %}',
         {"page": {"previous_url": None}},
     )
 
@@ -33,7 +33,7 @@ def test_template_if_block_omits_false_branch():
 
 def test_template_if_block_renders_true_branch():
     html = TemplateRenderer().render(
-        "{% if page.previous_url %}<a href=\"{{ page.previous_url }}\">Prev</a>{% endif %}",
+        '{% if page.previous_url %}<a href="{{ page.previous_url }}">Prev</a>{% endif %}',
         {"page": {"previous_url": "/older/"}},
     )
 
@@ -62,3 +62,31 @@ def test_template_renders_list_values_as_escaped_repr():
     assert "docs" in html
     assert html.startswith("<p>[")
     assert html.endswith("]</p>")
+
+
+def test_template_list_values_are_not_double_escaped():
+    html = TemplateRenderer().render(
+        "<p>{{ page.tags }}</p>",
+        {"page": {"tags": ["a<b"]}},
+    )
+
+    assert "&lt;b" in html
+    assert "&amp;lt;" not in html
+
+
+def test_template_if_block_omits_false_boolean():
+    html = TemplateRenderer().render(
+        "{% if page.generated %}generated{% endif %}",
+        {"page": {"generated": False}},
+    )
+
+    assert html == ""
+
+
+def test_template_if_block_omits_zero():
+    html = TemplateRenderer().render(
+        "{% if page.count %}yes{% endif %}",
+        {"page": {"count": 0}},
+    )
+
+    assert html == ""

@@ -23,7 +23,13 @@ def render_site(
     failed_page_keys: set[str] | None = None,
 ) -> list[RenderedPage]:
     renderer = template_renderer or TemplateRenderer()
-    partials = load_partials(site.config.partial_dir)
+    try:
+        partials = load_partials(site.config.partial_dir)
+    except TemplateRenderError as exc:
+        if errors is None:
+            raise
+        errors.append(str(exc))
+        partials = {}
     seen_warnings = set(site.warnings)
     layout_cache: dict[str, str] = {}
     rendered: list[RenderedPage] = []
@@ -50,6 +56,8 @@ def render_page(
     seen_warnings: set[str] | None = None,
 ) -> RenderedPage:
     layout_path = site.config.layout_dir / page.layout
+    # Defense-in-depth: layouts are validated earlier in SiteBuilder, but
+    # render_page may also be called directly without that pass.
     if not layout_path.exists():
         source = page.source_path or page.url
         raise MissingLayoutError(
@@ -64,9 +72,7 @@ def render_page(
             layout_text = layout_path.read_text(encoding="utf-8")
             if layout_cache is not None:
                 layout_cache[page.layout] = layout_text
-        _warn_unknown_partials(
-            layout_text, page.layout, partials, site.warnings, seen_warnings
-        )
+        _warn_unknown_partials(layout_text, page.layout, partials, site.warnings, seen_warnings)
         context = build_context(page, site, partials)
         context["site"] = {
             **context["site"],
@@ -97,8 +103,7 @@ def prerender_partials(
             "site": {**context["site"], "partials": rendered},
         }
         rendered = {
-            name: renderer.render(content, partial_context)
-            for name, content in partials.items()
+            name: renderer.render(content, partial_context) for name, content in partials.items()
         }
         if rendered == prior:
             return rendered
@@ -139,6 +144,7 @@ def build_context(page: Page, site: SiteModel, partials: dict[str, str]) -> dict
             "previous_url": page.previous_url,
             "next_url": page.next_url,
             "generated": page.generated,
+            "draft": page.draft,
             "canonical_url": canonical_url(site.config.base_url, page.url),
         },
         "site": {
@@ -147,8 +153,7 @@ def build_context(page: Page, site: SiteModel, partials: dict[str, str]) -> dict
             "assets_dir": site.config.assets_dir,
             "pages": [page_to_context(item) for item in site.pages],
             "tags": {
-                tag: [page_to_context(item) for item in pages]
-                for tag, pages in site.tags.items()
+                tag: [page_to_context(item) for item in pages] for tag, pages in site.tags.items()
             },
             "collections": {
                 name: [page_to_context(item) for item in pages]

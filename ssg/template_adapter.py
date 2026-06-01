@@ -56,7 +56,7 @@ def format_template_value(value: Any, *, use_safe: bool = False) -> str:
     if use_safe:
         return str(value)
     if isinstance(value, (list, dict, tuple, set)):
-        return html.escape(repr(value))
+        return repr(value)
     return str(value)
 
 
@@ -79,6 +79,10 @@ def _render_conditionals(template_text: str, context: dict[str, Any]) -> str:
 def _is_truthy(value: Any) -> bool:
     if value is None:
         return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
     if isinstance(value, str):
         return bool(value)
     if isinstance(value, (list, dict, tuple, set)):

@@ -16,9 +16,7 @@ def generate_derived_pages(
     taken_urls = {page.url for page in source_pages}
     generated: list[Page] = []
     generated.extend(generate_tag_pages(config, source_pages, warnings, taken_urls))
-    generated.extend(
-        generate_collection_pages(config, source_pages, warnings, taken_urls)
-    )
+    generated.extend(generate_collection_pages(config, source_pages, warnings, taken_urls))
     return generated
 
 
@@ -54,10 +52,28 @@ def index_pages_by_url(pages: list[Page]) -> dict[str, Page]:
             first = _source_label(existing)
             second = _source_label(page)
             raise SiteModelError(
-                f"duplicate URL {page.url} from {first} and {second}"
+                f"duplicate URL {page.url} from {first} and {second}",
+                path=page.source_path or page.url,
+                conflicting_urls=frozenset({existing.url, page.url}),
             )
         by_url[page.url] = page
     return by_url
+
+
+def dedupe_pages_by_url(pages: list[Page], warnings: list[str]) -> list[Page]:
+    kept: list[Page] = []
+    seen: dict[str, Page] = {}
+    for page in pages:
+        existing = seen.get(page.url)
+        if existing is not None:
+            warnings.append(
+                f"[site-model] skipping duplicate URL {page.url} from "
+                f"{_source_label(page)} (keeping {_source_label(existing)})"
+            )
+            continue
+        seen[page.url] = page
+        kept.append(page)
+    return kept
 
 
 def group_by_tag(pages: list[Page]) -> dict[str, list[Page]]:
@@ -76,10 +92,7 @@ def group_by_collection(pages: list[Page]) -> dict[str, list[Page]]:
         if page.generated or not page.collection:
             continue
         collections.setdefault(page.collection, []).append(page)
-    return {
-        collection: _sort_pages(group)
-        for collection, group in sorted(collections.items())
-    }
+    return {collection: _sort_pages(group) for collection, group in sorted(collections.items())}
 
 
 def assign_previous_next(collections: dict[str, list[Page]]) -> None:
@@ -111,9 +124,30 @@ def build_nav_tree(pages: list[Page]) -> NavNode:
 
 def render_nav_html(node: NavNode) -> str:
     if node.title == "root":
-        items = [_render_nav_item(child) for child in _sorted_nav_children(node)]
-        return "\n    ".join(item for item in items if item)
-    return _render_nav_item(node)
+        items = [
+            f"<li>{_render_nav_branch(child)}</li>"
+            for child in _sorted_nav_children(node)
+            if _render_nav_branch(child)
+        ]
+        if not items:
+            return ""
+        return "<ul>\n    " + "\n    ".join(items) + "\n  </ul>"
+    return _render_nav_branch(node)
+
+
+def _render_nav_branch(node: NavNode) -> str:
+    if node.url:
+        label = f'<a href="{html.escape(node.url, quote=True)}">{html.escape(node.title)}</a>'
+    elif node.title == "root":
+        return ""
+    else:
+        label = f"<span>{html.escape(node.title)}</span>"
+    if not node.children:
+        return label
+    child_lines = "\n      ".join(
+        f"<li>{_render_nav_branch(child)}</li>" for child in _sorted_nav_children(node)
+    )
+    return f"{label}\n    <ul>\n      {child_lines}\n    </ul>"
 
 
 def _sorted_nav_children(node: NavNode) -> list[NavNode]:
@@ -123,20 +157,7 @@ def _sorted_nav_children(node: NavNode) -> list[NavNode]:
     )
 
 
-def _render_nav_item(node: NavNode) -> str:
-    if node.url:
-        return (
-            f'<a href="{html.escape(node.url, quote=True)}">'
-            f"{html.escape(node.title)}</a>"
-        )
-    if node.title == "root":
-        return ""
-    return f"<span>{html.escape(node.title)}</span>"
-
-
-def _attach_intermediate_urls(
-    node: NavNode, prefix: str, pages_by_url: dict[str, Page]
-) -> None:
+def _attach_intermediate_urls(node: NavNode, prefix: str, pages_by_url: dict[str, Page]) -> None:
     for key, child in node.children.items():
         path = prefix + key
         candidate_url = f"/{path}/"
@@ -162,9 +183,7 @@ def generate_tag_pages(
         url = f"/tags/{slugify(tag)}/"
         if url in reserved_urls:
             if warnings is not None:
-                warnings.append(
-                    f"skipped generated tag page for '{tag}' — URL {url} already taken"
-                )
+                warnings.append(f"skipped generated tag page for '{tag}' — URL {url} already taken")
             continue
         reserved_urls.add(url)
         pages.append(
@@ -234,8 +253,7 @@ def generate_collection_pages(
 
 def _listing_html(title: str, pages: list[Page]) -> str:
     items = "\n".join(
-        f'<li><a href="{html.escape(page.url, quote=True)}">'
-        f'{html.escape(page.title)}</a></li>'
+        f'<li><a href="{html.escape(page.url, quote=True)}">{html.escape(page.title)}</a></li>'
         for page in _sort_pages(pages)
     )
     return f"<h1>{html.escape(title)}</h1>\n<ul>\n{items}\n</ul>"

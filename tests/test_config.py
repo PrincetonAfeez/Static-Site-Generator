@@ -28,7 +28,7 @@ def test_config_rejects_unsafe_output_dir(site_root):
 
 def test_config_rejects_malformed_toml(site_root):
     config_path = site_root / "site.toml"
-    config_path.write_text("title = \nbase_url = \"oops\"", encoding="utf-8")
+    config_path.write_text('title = \nbase_url = "oops"', encoding="utf-8")
 
     with pytest.raises(ConfigError):
         load_config(config_path)
@@ -105,8 +105,7 @@ def test_config_rejects_unknown_permalink_placeholder(site_root):
 def test_config_string_list_error_includes_path(site_root):
     config_path = site_root / "site.toml"
     config_path.write_text(
-        config_path.read_text(encoding="utf-8")
-        + "\n[scaffold]\npost_collections = 42\n",
+        config_path.read_text(encoding="utf-8") + "\n[scaffold]\npost_collections = 42\n",
         encoding="utf-8",
     )
 
@@ -189,8 +188,7 @@ def test_site_config_replace_creates_new_instance(site_root):
 def test_string_tuple_error_includes_field_name(site_root):
     config_path = site_root / "site.toml"
     config_path.write_text(
-        config_path.read_text(encoding="utf-8")
-        + "\n[scaffold]\npost_collections = 42\n",
+        config_path.read_text(encoding="utf-8") + "\n[scaffold]\npost_collections = 42\n",
         encoding="utf-8",
     )
 

@@ -10,6 +10,7 @@ from . import __version__
 from .builder import SiteBuilder
 from .config import load_config
 from .errors import CLIError, SSGError
+from .models import BuildResult
 from .scaffold import scaffold_content
 from .writer import remove_output_dir
 
@@ -30,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
             ).build()
             if not args.quiet:
                 print_build_summary(result)
-            if result.manifest.pages_failed > 0:
+            if result.manifest.pages_failed > 0 or result.manifest.errors:
                 return 1
             return 0
 
@@ -121,9 +122,9 @@ def _configure_logging(*, verbose: bool, quiet: bool) -> None:
     logging.basicConfig(level=level, format="%(message)s")
 
 
-def print_build_summary(result) -> None:
+def print_build_summary(result: BuildResult) -> None:
     manifest = result.manifest
-    if manifest.pages_failed > 0:
+    if manifest.pages_failed > 0 or manifest.errors:
         print("Build finished with errors.")
     else:
         print("Built site successfully.")

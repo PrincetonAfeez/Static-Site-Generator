@@ -103,11 +103,7 @@ def warn_collection_slug_collisions(pages: list[Page], warnings: list[str]) -> N
     for page in pages:
         if page.relative_source_path is None:
             continue
-        parts = [
-            part
-            for part in page.relative_source_path.parent.parts
-            if part not in {"", "."}
-        ]
+        parts = [part for part in page.relative_source_path.parent.parts if part not in {"", "."}]
         if not parts:
             continue
         raw_name = parts[0]

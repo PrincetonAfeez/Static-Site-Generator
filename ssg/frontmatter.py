@@ -127,8 +127,33 @@ def _unquote(value: str) -> str:
         inner = value[1:-1]
         if quote == '"':
             return _unescape_double_quoted(inner)
-        return inner
+        return _unescape_single_quoted(inner)
     return value
+
+
+def _unescape_single_quoted(value: str) -> str:
+    chars: list[str] = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char != "\\":
+            chars.append(char)
+            index += 1
+            continue
+        if index + 1 >= len(value):
+            chars.append("\\")
+            index += 1
+            continue
+        escape = value[index + 1]
+        if escape == "'":
+            chars.append("'")
+        elif escape == "\\":
+            chars.append("\\")
+        else:
+            chars.append("\\")
+            chars.append(escape)
+        index += 2
+    return "".join(chars)
 
 
 def _unescape_double_quoted(value: str) -> str:
