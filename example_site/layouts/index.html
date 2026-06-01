@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="canonical" href="{{ page.canonical_url }}">
+  <title>{{ page.title }} - {{ site.title }}</title>
+  <link rel="stylesheet" href="/{{ site.assets_dir }}/css/style.css">
+</head>
+<body>
+  {{ site.partials.header | safe }}
+  <main>
+    {{ page.body | safe }}
+  </main>
+  {{ site.partials.footer | safe }}
+</body>
+</html>

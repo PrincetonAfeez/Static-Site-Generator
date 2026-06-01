@@ -1,0 +1,839 @@
+STATIC SITE GENERATOR - BUILD-READY SCOPE
+Python Library + CLI Only
+No Django, No HTMX, No Database
+
+Purpose:
+Build a small Python static site generator that turns a folder of Markdown
+content, layouts, partials, and static assets into a dist/ folder of flat HTML
+files.
+
+This file is the canonical scope for the project. It is intentionally shorter
+than the earlier full scope so the app can be built in a clear order without
+scope creep.
+
+===============================================================================
+1. CORE DECISIONS
+===============================================================================
+
+Surface:
+- Python library core
+- argparse CLI
+- No web app layer
+- Optional local preview server only after the generator works
+
+Build strategy:
+- Clean full rebuild every time
+- No incremental builds in v1
+- No cache invalidation logic in v1
+
+Markdown:
+- Use a Markdown library such as markdown or mistune
+- Isolate it behind ssg/markdown_adapter.py
+- The rest of the pipeline must never call the Markdown library directly
+
+Templating:
+- Reuse the previous Mini Template Engine if available
+- Access it through ssg/template_adapter.py
+- Do not re-implement the template engine inside this project
+- Do not assume filters such as "| safe" exist unless App 52 actually supports
+  them
+
+Front matter:
+- Use a tiny YAML-like key-value parser
+- This is not full YAML
+- Supported fields are title, date, tags, layout, draft, slug, description,
+  and author
+
+Assets:
+- Copy static/ to dist/assets/
+- No bundling, minification, image optimization, or cache busting in v1
+
+Recommended implementation path:
+- Build the MVP first
+- Add tag pages, navigation, previous/next, partials, and manifest after the
+  basic pipeline works end to end
+
+===============================================================================
+2. WHAT THIS PROJECT IS
+===============================================================================
+
+This project is:
+- A file transformation pipeline
+- A static site generator
+- A Python library with a CLI wrapper
+- A composition project that reuses earlier tools
+- A staged architecture exercise
+
+This project is not:
+- A Django app
+- An HTMX app
+- A CMS
+- A blog hosting service
+- A database-backed publishing tool
+- A full clone of Hugo, Jekyll, MkDocs, or Eleventy
+- A live preview system with rebuild-on-save
+- A theme marketplace
+- An asset bundler
+
+The final artifact is plain files in dist/.
+
+===============================================================================
+3. SCOPE LEVELS
+===============================================================================
+
+MVP - build this first:
+- Load and validate site.toml
+- Discover Markdown files under content/
+- Skip hidden files and hidden directories
+- Parse front matter
+- Convert Markdown body to HTML through an adapter
+- Build Page models
+- Skip draft pages unless --drafts is passed
+- Build a basic SiteModel from all renderable pages
+- Render pages through layouts with the template adapter
+- Write HTML files to dist/
+- Copy static/ to dist/assets/
+- Support build, clean, and new CLI commands
+- Provide useful expected-error messages without raw tracebacks
+- Add focused unit tests and one integration fixture
+
+Version 1 - add after MVP works:
+- Tags grouped in the SiteModel
+- Generated tag pages
+- Collections grouped by directory
+- Blog or collection index pages
+- Navigation tree from the content hierarchy
+- Previous/next links inside a collection
+- Partials loaded at the SSG layer
+- Build manifest written to dist/.ssg-manifest.json
+- ADRs and polished README
+- Optional serve command using http.server
+
+Version 2 - explicitly out of scope for now:
+- Incremental builds
+- Watch mode
+- Live reload
+- Dependency graph
+- RSS
+- sitemap.xml
+- Pagination
+- Search index
+- Asset minification
+- JS/CSS bundling
+- Image optimization
+- Deployment command
+- Full YAML front matter
+
+===============================================================================
+4. RECOMMENDED PROJECT STRUCTURE
+===============================================================================
+
+static_site_generator/
+    pyproject.toml
+    README.md
+    cli.py
+
+    ssg/
+        __init__.py
+        assets.py
+        builder.py
+        config.py
+        discovery.py
+        errors.py
+        frontmatter.py
+        manifest.py
+        markdown_adapter.py
+        models.py
+        page_builder.py
+        renderer.py
+        scaffold.py
+        site_model.py
+        template_adapter.py
+        writer.py
+
+    example_site/
+        site.toml
+        content/
+            index.md
+            about.md
+            blog/
+                first-post.md
+        layouts/
+            base.html
+            page.html
+            post.html
+            tag.html
+        partials/
+            header.html
+            footer.html
+        static/
+            css/
+                style.css
+
+    tests/
+        test_config.py
+        test_discovery.py
+        test_frontmatter.py
+        test_markdown_adapter.py
+        test_page_builder.py
+        test_site_model.py
+        test_renderer.py
+        test_writer.py
+        test_assets.py
+        test_cli.py
+        test_pipeline_integration.py
+
+    docs/
+        adr/
+            0001-full-rebuild-over-incremental.md
+            0002-markdown-library-behind-adapter.md
+            0003-template-engine-through-adapter.md
+            0004-no-web-layer.md
+
+Dependency direction:
+- CLI imports the ssg library
+- ssg library must not import CLI code
+- ssg library must not import Django or HTMX
+- builder orchestrates stages
+- stages communicate through dataclasses
+- adapters isolate external/local dependencies
+
+===============================================================================
+5. EXAMPLE SITE INPUT AND OUTPUT
+===============================================================================
+
+Input site:
+
+my_site/
+    site.toml
+    content/
+        index.md
+        about.md
+        blog/
+            hello-world.md
+    layouts/
+        base.html
+        page.html
+        post.html
+    partials/
+        header.html
+        footer.html
+    static/
+        css/
+            style.css
+        images/
+            logo.png
+
+Output:
+
+my_site/
+    dist/
+        index.html
+        about/
+            index.html
+        blog/
+            hello-world/
+                index.html
+        assets/
+            css/
+                style.css
+            images/
+                logo.png
+
+===============================================================================
+6. CONFIGURATION
+===============================================================================
+
+Config file:
+- site.toml
+- Use tomllib on Python 3.11+
+
+Example:
+
+title = "My Static Site"
+base_url = "https://example.com"
+content_dir = "content"
+layout_dir = "layouts"
+partial_dir = "partials"
+static_dir = "static"
+output_dir = "dist"
+default_layout = "page.html"
+permalink = "/{path}/{slug}/"
+
+[build]
+drafts = false
+clean = true
+
+SiteConfig fields:
+- root_dir
+- title
+- base_url
+- content_dir
+- layout_dir
+- partial_dir
+- static_dir
+- output_dir
+- default_layout
+- permalink
+- include_drafts
+- clean_output
+
+Validation:
+- required fields have defaults where reasonable
+- directories are resolved relative to root_dir
+- output_dir must be safe to delete
+- permalink must produce absolute site URLs beginning with /
+- output paths must stay inside output_dir
+
+Critical safety rule:
+Before deleting output_dir, resolve it to an absolute path and confirm it is:
+- inside the site root
+- not the site root itself
+- not content_dir
+- not layout_dir
+- not static_dir
+- not the user home directory
+- not a drive root
+
+===============================================================================
+7. DATA MODELS
+===============================================================================
+
+Use dataclasses as contracts between stages.
+
+SourceFile:
+- path
+- relative_path
+- extension
+
+ParsedDocument:
+- source
+- metadata
+- body_markdown
+- raw_text
+
+Page:
+- source_path
+- relative_source_path
+- title
+- slug
+- url
+- output_path
+- layout
+- date
+- tags
+- draft
+- body_html
+- metadata
+- collection
+- generated
+- previous_url
+- next_url
+
+SiteModel:
+- config
+- pages
+- pages_by_url
+- tags
+- collections
+- nav_tree
+- build_time
+- warnings
+
+BuildManifest:
+- started_at
+- finished_at
+- elapsed_seconds
+- pages_discovered
+- pages_rendered
+- drafts_skipped
+- generated_pages
+- assets_copied
+- warnings
+- errors
+- output_files
+
+===============================================================================
+8. PIPELINE
+===============================================================================
+
+The pipeline is the heart of the app.
+
+Order:
+
+1. Load config
+2. Clean output directory if enabled
+3. Discover content files
+4. Parse front matter
+5. Convert Markdown body to HTML
+6. Build source Page models
+7. Filter drafts unless include_drafts is true
+8. Build initial site data from source pages
+9. Generate derived pages, if the feature is enabled
+10. Build the final SiteModel from source pages plus generated pages
+11. Validate duplicate URLs
+12. Compute tags, collections, navigation, and previous/next links
+13. Render each page through the selected layout
+14. Write HTML files
+15. Copy static assets
+16. Write build manifest, if enabled
+17. Return a build result with stats and warnings
+
+Important correction:
+Drafts cannot be skipped during discovery because draft status lives in front
+matter. Discovery only finds files. Draft filtering happens after parsing and
+page building.
+
+Generated page rule:
+Generated pages must be added before the final URL index is validated and before
+rendering begins. This prevents tag pages or index pages from accidentally
+colliding with real content URLs.
+
+Stage rule:
+Each stage should have a clear input and output. Avoid hiding the whole build in
+one large function.
+
+===============================================================================
+9. FRONT MATTER DSL
+===============================================================================
+
+Front matter appears at the very top of a Markdown file.
+
+Example:
+
+---
+title: My First Post
+date: 2026-05-26
+tags: python, static-sites
+layout: post.html
+draft: false
+slug: my-first-post
+description: A short description
+author: Prince
+---
+
+# My First Post
+
+Body content starts here.
+
+Supported syntax:
+- key: value
+- booleans: true or false
+- tags: comma-separated values
+- dates: ISO date strings, kept as strings or parsed consistently
+- quoted strings are optional
+
+Not supported in v1:
+- nested YAML
+- arrays using YAML syntax
+- multiline values
+- arbitrary metadata types
+
+Missing front matter:
+- Allowed
+- Use filename-derived title and slug
+- Use default layout
+- draft defaults to false
+
+Malformed front matter:
+- Raise FrontMatterError
+- Include file path
+- Include line number when possible
+
+===============================================================================
+10. URL AND OUTPUT RULES
+===============================================================================
+
+Slug derivation:
+1. Use front matter slug if present
+2. Otherwise use the filename stem
+3. Normalize to lowercase URL-safe text
+
+Special case:
+- content/index.md maps to /
+- content/about.md maps to /about/
+- content/blog/hello-world.md maps to /blog/hello-world/
+
+Output mapping:
+- / maps to dist/index.html
+- /about/ maps to dist/about/index.html
+- /blog/hello-world/ maps to dist/blog/hello-world/index.html
+
+Permalink:
+- v1 supports a simple default: /{path}/{slug}/
+- Complex permalink schemes are version 2
+
+Path safety:
+- Never allow output paths to escape output_dir
+- Reject slugs or paths containing traversal behavior such as ..
+
+===============================================================================
+11. TEMPLATING AND PARTIALS
+===============================================================================
+
+Template rendering goes through TemplateRenderer in ssg/template_adapter.py.
+
+The renderer receives:
+- layout text
+- context dictionary
+
+Context includes:
+
+page:
+- title
+- url
+- body
+- tags
+- date
+- metadata
+
+site:
+- title
+- base_url
+- pages
+- tags
+- nav
+- build_time
+
+Layout selection:
+1. page front matter layout
+2. config default_layout
+3. error if layout is missing
+
+Partials:
+- MVP may skip partials
+- v1 may load partial files at the SSG layer
+- Do not add file-loading behavior into the template engine
+- If App 52 does not support include syntax, load partial text into context
+  instead, for example site.partials.header
+
+Example layout:
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }} - {{ site.title }}</title>
+</head>
+<body>
+  <main>
+    {{ page.body }}
+  </main>
+</body>
+</html>
+
+Note:
+page.body already contains HTML from Markdown. If the template engine escapes
+output by default, the adapter must provide a deliberate safe-HTML mechanism
+that matches the real App 52 engine.
+
+===============================================================================
+12. SITE MODEL FEATURES
+===============================================================================
+
+MVP SiteModel:
+- pages
+- pages_by_url
+- build_time
+- warnings
+- duplicate URL detection
+
+Version 1 SiteModel:
+- tags: tag name to pages
+- collections: directory or collection name to pages
+- nav_tree: hierarchy derived from page URLs
+- previous_url and next_url inside ordered collections
+
+Generated pages:
+- Tag pages use URLs like /tags/python/
+- Collection index pages use URLs like /blog/
+- Generated pages should use the same Page dataclass with generated=True
+
+Sorting:
+- Use date descending for posts when dates exist
+- Fall back to source path order for deterministic output
+
+===============================================================================
+13. CLI SCOPE
+===============================================================================
+
+Commands:
+
+ssg build
+- run the full pipeline
+- default config is site.toml
+- write dist/
+
+ssg build --config path/to/site.toml
+- use custom config
+
+ssg build --drafts
+- include draft pages
+
+ssg build --verbose
+- print stage-level progress
+
+ssg new blog/my-first-post --title "My First Post"
+- create content/blog/my-first-post.md with front matter
+
+ssg clean
+- remove the configured output directory after safety checks
+
+ssg serve
+- optional v1 stretch
+- serve dist/ with http.server
+- no rebuild-on-save
+
+Exit codes:
+- 0: success
+- 1: expected build failure, such as malformed content or missing layout
+- 2: CLI usage error
+- 3: unexpected internal error
+
+===============================================================================
+14. ERROR HANDLING
+===============================================================================
+
+Use stage-specific exceptions:
+- SSGError
+- ConfigError
+- DiscoveryError
+- FrontMatterError
+- MarkdownConversionError
+- PageBuildError
+- SiteModelError
+- TemplateRenderError
+- MissingLayoutError
+- OutputWriteError
+- AssetCopyError
+- BuildError
+- CLIError
+
+Principles:
+- Expected errors should not show raw tracebacks
+- Include stage name
+- Include file path when possible
+- Include front matter line number when possible
+- Missing layouts must name both the page and missing layout
+- Duplicate URLs must name both sources
+
+Example messages:
+
+[frontmatter] content/blog/post.md:3: invalid boolean for draft: "maybe"
+[render] content/about.md: missing layout "page.html"
+[site-model] duplicate URL /about/ from content/about.md and content/company/about.md
+
+MVP policy:
+- Fail fast on expected build errors
+
+Optional v1 policy:
+- --continue-on-error can skip broken pages and report warnings
+
+===============================================================================
+15. TESTING STRATEGY
+===============================================================================
+
+Use pytest if available. unittest is acceptable.
+
+MVP tests:
+- config loads site.toml and applies defaults
+- config rejects unsafe output_dir
+- discovery finds Markdown files recursively
+- discovery skips hidden files and directories
+- front matter parses title, tags, layout, draft, and slug
+- front matter reports malformed input with file and line
+- markdown adapter converts a simple heading
+- page builder derives slug, URL, layout, and output path
+- draft pages are skipped unless --drafts is passed
+- site model detects duplicate URLs
+- renderer loads layout and passes page/site context
+- missing layout raises MissingLayoutError
+- writer writes HTML inside dist/
+- assets copy to dist/assets/
+- CLI build creates expected files for example_site
+- CLI clean removes dist/ safely
+- CLI new scaffolds a content file
+
+Version 1 tests:
+- tag grouping
+- generated tag pages
+- collection grouping
+- navigation tree
+- previous/next links
+- partial loading
+- build manifest
+- serve command if implemented
+
+Integration test:
+- Build example_site/
+- Assert dist/index.html exists
+- Assert dist/about/index.html exists
+- Assert a blog page exists
+- Assert assets were copied
+- Assert rendered HTML contains expected content
+
+===============================================================================
+16. ADRS TO WRITE
+===============================================================================
+
+ADR 0001: Full rebuild over incremental builds
+- Decision: clean full rebuild in v1
+- Reason: correctness and simplicity
+- Trade-off: every build processes the whole site
+
+ADR 0002: Markdown library behind an adapter
+- Decision: use markdown or mistune behind MarkdownConverter
+- Reason: this project is about the build pipeline, not Markdown parsing
+- Trade-off: one external dependency
+
+ADR 0003: Template engine through an adapter
+- Decision: reuse the Mini Template Engine through TemplateRenderer
+- Reason: proves the earlier project is composable
+- Trade-off: SSG depends on a local reusable module
+
+ADR 0004: No web layer
+- Decision: no Django and no HTMX
+- Reason: static site generation outputs flat files
+- Trade-off: no browser admin interface
+
+ADR 0005: Generated pages before final render
+- Decision: generated pages are added before final URL validation and rendering
+- Reason: all renderable pages should share the same model and collision checks
+- Trade-off: no streaming render
+
+===============================================================================
+17. RECOMMENDED BUILD ORDER
+===============================================================================
+
+Phase 1: Foundation
+- Create package structure
+- Add models.py
+- Add errors.py
+- Add pyproject.toml
+- Add README skeleton
+
+Phase 2: Config
+- Implement SiteConfig
+- Load site.toml
+- Validate paths and output safety
+- Add tests
+
+Phase 3: Discovery
+- Recursively find Markdown files
+- Skip hidden files and directories
+- Sort results deterministically
+- Add tests
+
+Phase 4: Front Matter
+- Split front matter from body
+- Parse key-value fields
+- Add line-aware errors
+- Add tests
+
+Phase 5: Markdown Adapter
+- Add MarkdownConverter
+- Integrate markdown or mistune
+- Add adapter tests
+
+Phase 6: Page Builder
+- Build Page from ParsedDocument and HTML
+- Derive slug, URL, layout, and output path
+- Preserve draft flag
+- Add tests
+
+Phase 7: Basic SiteModel
+- Filter drafts
+- Index pages by URL
+- Detect duplicates
+- Add tests
+
+Phase 8: Renderer
+- Load layouts
+- Build context
+- Call template adapter
+- Handle missing layouts
+- Add tests
+
+Phase 9: Writer and Assets
+- Clean output safely
+- Write HTML files
+- Copy static files to dist/assets/
+- Add tests
+
+Phase 10: CLI MVP
+- Implement build
+- Implement clean
+- Implement new
+- Add --config, --drafts, and --verbose
+- Add CLI tests
+
+Phase 11: Integration
+- Build example_site/
+- Assert expected dist tree
+- Fix pipeline edge cases
+
+Phase 12: Version 1 Features
+- Add tags
+- Add generated tag pages
+- Add collections
+- Add nav tree
+- Add previous/next links
+- Add partials
+- Add manifest
+- Add ADRs
+
+Phase 13: Optional Serve
+- Add http.server preview
+- Serve dist/
+- Keep it separate from the build pipeline
+
+===============================================================================
+18. ACCEPTANCE CRITERIA
+===============================================================================
+
+MVP is complete when:
+1. site.toml loads and validates.
+2. Unsafe output directories are rejected.
+3. Markdown files are discovered recursively.
+4. Hidden files and directories are skipped.
+5. Front matter is parsed.
+6. Missing front matter is allowed.
+7. Malformed front matter reports file and line when possible.
+8. Markdown conversion happens through the adapter.
+9. Page model derives slug, URL, layout, and output path.
+10. Drafts are skipped unless --drafts is passed.
+11. SiteModel contains renderable pages before rendering.
+12. Duplicate URLs are detected.
+13. Layout rendering uses the template adapter.
+14. Missing layout errors name page and layout.
+15. HTML files are written to dist/.
+16. Static assets are copied to dist/assets/.
+17. Clean rebuild removes stale output safely.
+18. build CLI command works.
+19. clean CLI command works.
+20. new CLI command works.
+21. Expected errors do not show raw tracebacks.
+22. Integration test builds example_site successfully.
+23. README explains the pipeline and basic site structure.
+24. There is no Django or HTMX layer.
+
+Version 1 is complete when:
+1. Tags are grouped.
+2. Tag pages are generated.
+3. Collections are grouped.
+4. Collection index pages are generated.
+5. Navigation tree is generated.
+6. Previous/next links are computed.
+7. Partials are available through the SSG layer.
+8. Build manifest records outputs and timing.
+9. ADRs document major decisions.
+10. Optional serve command works if included.
+
+===============================================================================
+19. ONE-SENTENCE DESCRIPTION
+===============================================================================
+
+A Python static site generator that reads Markdown files with small front
+matter, converts them to HTML, builds Page and Site models, renders layouts
+through a reusable template engine, writes flat files to dist/, copies assets,
+and exposes the build pipeline through a clean argparse CLI.

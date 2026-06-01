@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+build/
+dist/
+example_site/dist/
+example_site/**/build/
+**/.ssg-manifest.json
+.coverage

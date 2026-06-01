@@ -1,0 +1,99 @@
+Static Site Generator — combines file I/O, templating, and a small build pipeline (CLI)
+
+Focus: Algorithms and Data Structures
+Goal: step away from CRUD and build things that force you to think about algorithms, not frameworks. Pure Python again.
+
+Concepts: recursion, algorithmic thinking, custom data structures, parsing, small DSLs.
+
+Build the Library + CLI as the real project and treat Django + HTMX as a thin optional showcase layered on top — same engine, no logic duplicated.
+
+The framing fits the block cleanly: pure Python, Library + CLI, and uniquely for this rung. No web layer — an SSG's whole job is to replace a running web server with flat files, so a Django layer would contradict the premise.
+
+Taking "2" = use a Markdown library (markdown/mistune) for the conversion stage — the pragmatic call that keeps the spotlight on the build pipeline, which is what's actually new this rung. For the other two forks I'm defaulting to the choices I pushed for: clean full rebuild every time (the clear 12-month choice) and reuse your App 52 Mini Template Engine (the full-circle choice that proves 52's decoupling). Flip either with a word.
+One honest flag on that combination: using a library for Markdown means this rung loses its hand-rolled parsing rep — but you just did exactly that in App 52, so the reps aren't lost across the block, they're just spent on the engine instead of the converter. The new skill here is the pipeline, and the library keeps it front and center. Good trade.
+Here's the full scope for App 53 — Static Site Generator. No code — the reviewer-ready blueprint.
+1. Scope decisions (locked)
+
+Surface: Library core + argparse CLI. No web layer — an SSG's whole job is to replace a running server with flat files.
+Markdown: Converted via a library (markdown or mistune), wrapped behind a thin adapter so it's swappable.
+Build strategy: Clean full rebuild every time. No incremental/caching.
+Templating: Reuses the App 52 Mini Template Engine — imported, not re-implemented.
+Posture: Pure Python orchestration. The headline skill is composition of your own earlier work into a staged pipeline.
+
+2. The build pipeline (the heart of the rung)
+An ordered sequence of stages, each a clean transformation with typed hand-offs:
+
+Discover — recursively walk content/ (App 49's walker, reused), collect sources, skip drafts/dotfiles.
+Read & parse front matter — split each file into metadata + body.
+Convert — Markdown body → HTML (library adapter).
+Build page model — assemble metadata + rendered body + derived fields (URL, slug).
+Build site model — collect all pages before any render; index by URL.
+Render — feed each page model through the App 52 engine to wrap in layouts.
+Write — emit HTML to dist/, mirroring source structure.
+Copy assets — pass static files through untouched.
+
+The discipline: stages are separate and ordered, each consumes the previous stage's output, and any stage can be run or inspected in isolation. That staged-transformation architecture is the whole point.
+3. Content processing
+
+Front-matter parsing — a metadata block at the top of each file (title, date, tags, layout, draft), separated from the body. A small key-value DSL — the one genuine parsing rep that survives the library choice.
+Markdown → HTML — via the library, behind a Converter adapter so the dependency is isolated and swappable.
+Slug / URL derivation — content/blog/my-post.md → /blog/my-post/, with a configurable permalink scheme.
+Draft handling — draft: true skipped in production, included with --drafts.
+
+4. Templating & layouts (App 52, reused)
+
+Layout application — each page declares a layout; the engine wraps the rendered body. Proves App 52's core was decoupled enough to embed — the payoff of that rung.
+Template context — each page gets its metadata + body + site-wide globals (site title, nav, build time) as variables.
+The {% include %} decision — App 52 deliberately left includes out of the engine. If you want shared header/footer partials, they're resolved here at the SSG level via an asset/partial loader, not baked back into the engine. That's the architecture call this rung makes you confront.
+
+5. Site-level features (the data-structure rep)
+
+The site model — an in-memory representation of the whole site: all pages, indexed by URL, queryable. The custom data structure for this rung.
+Collections / tag indexes — group pages by tag or directory, auto-generate listing pages (a "blog" index of all posts). Where the site model earns its keep.
+Navigation generation — build a nav tree from the content hierarchy (recursion, over the page tree).
+Cross-page awareness — prev/next post, related-by-tag. This is why discover-and-model-all must precede any render — a real ordering constraint you architect around, not stumble into.
+
+6. Build pipeline mechanics (the system-design meat)
+
+Dependency ordering — discover-all-before-render enforced, not accidental; the pipeline knows the render stage needs the full site model.
+Clean output — wipe/reconcile dist/ between builds so deleted sources don't leave orphaned HTML.
+Build manifest — record what was built (pages, timing, warnings) — observability, the same instinct as App 50's exit codes.
+
+7. CLI layer
+
+build — run the full pipeline, source → dist/.
+new — scaffold a content file with front matter pre-filled.
+clean — remove dist/.
+serve (stretch) — a dumb http.server local preview, no rebuild-on-save (that's the networking block). Optional.
+Config file — site.toml for title, paths, permalink scheme; parsed and validated (a soft bridge toward App 54's Config Manager).
+Flags: --drafts, --verbose; clean exit codes; per-file error reporting that names the offending file.
+
+8. Error handling (the maturity signal)
+
+Per-file isolation — a malformed front matter or template error in one page reports clearly and (configurably) either fails the build or skips that page and continues. Never a raw traceback into the renderer.
+Stage-tagged errors — know whether the failure was discovery, parsing, conversion, or rendering — the payoff of separating the stages.
+Missing-template / missing-layout caught with a message naming what's missing and which page wanted it.
+
+9. Architecture & layering (the system-design signal)
+
+ssg (library core) — Site(config).build() orchestrates the pipeline; each stage is a separate, independently testable unit with typed input/output. Pure Python.
+Composition over reinvention — the SSG imports the App 52 engine and the App 49 walker rather than rebuilding them. The capstone's real lesson: clean earlier modules compose into a larger system. If they were built decoupled, this is effortless; if not, this is where it hurts — which is itself the teaching.
+Models as contracts — Page and Site dataclasses carry data between stages; stages never reach around them.
+The Markdown adapter — the one external dependency, isolated behind an interface so the library never leaks into the pipeline.
+Dependency direction: CLI → Site (pipeline) → stages → (template engine, walker, markdown adapter) → models. One-way.
+
+10. Testing strategy
+
+Front-matter parser: present/absent/malformed metadata.
+Converter adapter: known Markdown → expected HTML; adapter isolates the library so tests don't pin its internals.
+Page builder: slug/URL derivation across nested paths and permalink schemes.
+Site builder: tag grouping, generated listing pages, nav tree shape, prev/next linking.
+Pipeline: a fixture example_site/ builds to an expected dist/ tree (the real integration test).
+CLI: build produces output, clean removes it, exit codes, per-file error reporting.
+
+11. The ADRs you'd write
+
+"Full rebuild over incremental builds." Rationale: correctness and simplicity over speed; a full rebuild can't leave stale or orphaned output, and there's no cache-invalidation logic to get wrong. Trade-off: rebuilds the whole site on any change — acceptable at this scale, and incremental is named as future work (the real cache-invalidation problem deferred deliberately).
+"Markdown library behind an adapter, not hand-rolled." Rationale: the parsing reps were spent on App 52's engine; the new skill this rung teaches is the pipeline, so the converter is isolated behind an interface and delegated to a mature library. Trade-off: an external dependency — contained to one module and swappable.
+"{% include %} resolved at the SSG layer, not in the template engine." Rationale: App 52 deliberately kept includes out to stay a pure renderer; partials are a site-assembly concern, so the loader lives here. Trade-off: the engine can't pull partials on its own — correct, that separation is the point.
+"Discover-and-model-all before render." Rationale: cross-page features (nav, prev/next, tag indexes) need the complete site model first; the stage ordering enforces it. Trade-off: no streaming/early output — irrelevant for a static build.

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "static-site-generator"
+version = "0.1.0"
+description = "A small Python static site generator with a staged build pipeline."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Prince" }]
+keywords = ["static-site-generator", "markdown", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+dependencies = [
+    "Markdown>=3.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "mypy>=1.0",
+    "ruff>=0.14",
+]
+
+[project.urls]
+Documentation = "https://github.com/princ/static-site-generator#readme"
+Repository = "https://github.com/princ/static-site-generator"
+Changelog = "https://github.com/princ/static-site-generator/blob/main/CHANGELOG.md"
+
+[project.scripts]
+ssg = "ssg.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ssg*"]
+
+[tool.setuptools.package-data]
+ssg = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["ssg"]
+strict = false
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["I001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]

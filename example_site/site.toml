@@ -1,0 +1,13 @@
+title = "Example Static Site"
+base_url = "https://example.com"
+content_dir = "content"
+layout_dir = "layouts"
+partial_dir = "partials"
+static_dir = "static"
+output_dir = "dist"
+default_layout = "page.html"
+permalink = "/{path}/{slug}/"
+
+[build]
+drafts = false
+clean = true
