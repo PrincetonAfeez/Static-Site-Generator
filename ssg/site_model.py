@@ -1,3 +1,5 @@
+""" Static Site Generator Site Model """
+
 from __future__ import annotations
 
 import html
