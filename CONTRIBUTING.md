@@ -12,8 +12,8 @@ results locally.
 ## Setup
 
 ```powershell
-git clone https://github.com/princ/static-site-generator.git
-cd static-site-generator
+git clone https://github.com/PrincetonAfeez/Static-Site-Generator.git
+cd Static-Site-Generator
 pip install -r requirements.txt -r requirements-dev.txt -e .
 ```
 
@@ -38,7 +38,7 @@ This runs, in order:
 1. `ruff check ssg tests`
 2. `ruff format --check ssg tests`
 3. `mypy ssg`
-4. `pytest --cov=ssg --cov-fail-under=90`
+4. `pytest --cov=ssg --cov-fail-under=97`
 
 ## Running tests only
 
