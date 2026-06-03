@@ -1,4 +1,4 @@
-# Security
+# Security 
 
 This static site generator is a **local build tool**, not a hosted multi-tenant
 service. The security model focuses on safe filesystem access and predictable HTML
