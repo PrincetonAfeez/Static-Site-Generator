@@ -1,4 +1,4 @@
-# Architecture
+# Architecture 
 
 This document describes the Static Site Generator pipeline, module boundaries, and
 error-recovery behaviour. It complements the [ADRs](adr/) and the [project spec](spec/static_site_generator_improved_full_scope.txt).
