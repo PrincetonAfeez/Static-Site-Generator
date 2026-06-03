@@ -11,5 +11,6 @@ example_site/dist/
 example_site/**/build/
 **/.ssg-manifest.json
 .coverage
+docs/spec/
 
 
