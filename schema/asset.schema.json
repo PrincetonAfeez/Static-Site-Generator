@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/static-site-generator/schema/asset.schema.json",
+  "title": "Static Site Generator Asset",
+  "description": "Validates static assets copied or transformed during a site build.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "destination", "type"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": ["image", "stylesheet", "script", "font", "document", "data", "other"]
+    },
+    "mimeType": {
+      "type": "string"
+    },
+    "altText": {
+      "type": "string"
+    },
+    "fingerprinted": {
+      "type": "boolean",
+      "default": false
+    },
+    "hash": {
+      "type": "string"
+    },
+    "sizeBytes": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

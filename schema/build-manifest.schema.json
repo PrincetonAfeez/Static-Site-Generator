@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/static-site-generator/schema/build-manifest.schema.json",
+  "title": "Static Site Generator Build Manifest",
+  "description": "Validates a generated manifest that records the output of a static site build.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["site", "generatedAt", "pages", "assets"],
+  "properties": {
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "baseUrl"],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generatorVersion": {
+      "type": "string"
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "output", "url"],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "asset.schema.json"
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assetCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

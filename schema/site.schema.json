@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/static-site-generator/schema/site.schema.json",
+  "title": "Static Site Generator Site Configuration",
+  "description": "Validates the global configuration for a static site generator project.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["site", "paths"],
+  "properties": {
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "baseUrl"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "language": {
+          "type": "string",
+          "default": "en"
+        },
+        "author": {
+          "type": "string"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content", "templates", "static", "output"],
+      "properties": {
+        "content": {
+          "type": "string",
+          "default": "content"
+        },
+        "templates": {
+          "type": "string",
+          "default": "templates"
+        },
+        "static": {
+          "type": "string",
+          "default": "static"
+        },
+        "output": {
+          "type": "string",
+          "default": "public"
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cleanOutput": {
+          "type": "boolean",
+          "default": true
+        },
+        "prettyUrls": {
+          "type": "boolean",
+          "default": true
+        },
+        "minifyHtml": {
+          "type": "boolean",
+          "default": false
+        },
+        "includeDrafts": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "navigation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "url"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

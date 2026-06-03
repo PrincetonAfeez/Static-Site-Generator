@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/static-site-generator/schema/page.schema.json",
+  "title": "Static Site Generator Page",
+  "description": "Validates metadata for a page or post processed by the static site generator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "slug", "template", "status"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "template": {
+      "type": "string",
+      "minLength": 1,
+      "default": "page.html"
+    },
+    "layout": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published", "archived"]
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "author": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "draft": {
+      "type": "boolean",
+      "default": false
+    },
+    "featuredImage": {
+      "type": "string"
+    },
+    "custom": {
+      "type": "object",
+      "description": "Project-specific metadata that does not belong in the core page contract.",
+      "additionalProperties": true
+    }
+  }
+}
