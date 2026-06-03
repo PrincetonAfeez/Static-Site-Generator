@@ -1,3 +1,5 @@
+""" Test Markdown Adapter """
+
 from __future__ import annotations
 
 from ssg.config import load_config
