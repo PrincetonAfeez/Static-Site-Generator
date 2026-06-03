@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "static-site-generator"
-version = "0.3.0"
+version = "0.4.0"
 description = "A small Python static site generator with a staged build pipeline."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "Markdown>=3.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -36,9 +37,9 @@ test = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/princ/static-site-generator#readme"
-Repository = "https://github.com/princ/static-site-generator"
-Changelog = "https://github.com/princ/static-site-generator/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/PrincetonAfeez/Static-Site-Generator#readme"
+Repository = "https://github.com/PrincetonAfeez/Static-Site-Generator"
+Changelog = "https://github.com/PrincetonAfeez/Static-Site-Generator/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ssg = "ssg.cli:main"
@@ -58,15 +59,23 @@ source = ["ssg"]
 branch = false
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 97
 show_missing = true
 
 [tool.mypy]
 python_version = "3.11"
-files = ["ssg"]
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
+warn_return_any = false
+disallow_incomplete_defs = false
 
 [tool.ruff]
 line-length = 100
