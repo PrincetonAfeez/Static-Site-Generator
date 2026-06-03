@@ -1,3 +1,5 @@
+""" Static Site Generator Renderer """
+
 from __future__ import annotations
 
 import re
