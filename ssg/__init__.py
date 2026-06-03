@@ -1,4 +1,6 @@
-__version__ = "0.3.0"
+""" Static Site Generator """
+
+__version__ = "0.4.0"
 
 from .builder import SiteBuilder
 from .config import load_config
