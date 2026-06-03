@@ -1,4 +1,4 @@
-# ADR 0005: Generated Pages Before Final Render
+# ADR 0005: Generated Pages Before Final Render 
 
 ## Status
 
