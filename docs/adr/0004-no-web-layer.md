@@ -1,4 +1,4 @@
-# ADR 0004: No Web Layer
+# ADR 0004: No Web Layer 
 
 ## Status
 
