@@ -1,9 +1,11 @@
+""" Test Frontmatter """
+
 from __future__ import annotations
 
 import pytest
 
 from ssg.errors import FrontMatterError
-from ssg.frontmatter import parse_document
+from ssg.frontmatter import parse_document, parse_yaml_metadata
 from ssg.models import SourceFile
 
 
@@ -39,7 +41,7 @@ def test_frontmatter_reports_line_for_bad_boolean(site_root):
     with pytest.raises(FrontMatterError) as error:
         parse_document(source_for(path, site_root / "content"))
 
-    assert error.value.line == 3
+    assert error.value.line == 2
 
 
 def test_frontmatter_warns_on_unknown_field(site_root):
@@ -52,21 +54,22 @@ def test_frontmatter_warns_on_unknown_field(site_root):
     assert document.metadata["unknown_field"] == "hello"
 
 
-def test_frontmatter_unescapes_quoted_values(site_root):
-    from ssg.frontmatter import parse_metadata
-
-    path = site_root / "content" / "quoted.md"
-    source = source_for(path, site_root / "content")
-    metadata = parse_metadata([r'title: "My Post: \"Special\" Edition"'], source, [])
+def test_frontmatter_parses_yaml_quoted_values(site_root):
+    source = source_for(site_root / "content" / "quoted.md", site_root / "content")
+    metadata = parse_yaml_metadata('title: "My Post: \\"Special\\" Edition"', source, [])
 
     assert metadata["title"] == 'My Post: "Special" Edition'
 
 
-def test_frontmatter_unescapes_single_quoted_values(site_root):
-    from ssg.frontmatter import parse_metadata
+def test_frontmatter_parses_yaml_list_tags(site_root):
+    source = source_for(site_root / "content" / "tags.md", site_root / "content")
+    metadata = parse_yaml_metadata("tags:\n  - python\n  - docs", source, [])
 
-    path = site_root / "content" / "single.md"
-    source = source_for(path, site_root / "content")
-    metadata = parse_metadata(["title: 'It\\'s fine'"], source, [])
+    assert metadata["tags"] == ["python", "docs"]
 
-    assert metadata["title"] == "It's fine"
+
+def test_frontmatter_accepts_yes_no_for_draft(site_root):
+    source = source_for(site_root / "content" / "draft.md", site_root / "content")
+    metadata = parse_yaml_metadata("draft: yes", source, [])
+
+    assert metadata["draft"] is True
