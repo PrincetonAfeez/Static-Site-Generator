@@ -1,4 +1,4 @@
-# ADR 0002: Markdown Library Behind an Adapter
+# ADR 0002: Markdown Library Behind an Adapter 
 
 ## Status
 
