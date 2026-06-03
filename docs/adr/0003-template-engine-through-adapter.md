@@ -1,4 +1,4 @@
-# ADR 0003: Template Engine Through an Adapter
+# ADR 0003: Template Engine Through an Adapter 
 
 ## Status
 
