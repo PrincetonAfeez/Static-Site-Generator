@@ -1,3 +1,5 @@
+""" Static Site Generator Builder """
+
 from __future__ import annotations
 
 import dataclasses
@@ -6,7 +8,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 
-from .assets import copy_assets
+from .assets import copy_assets, read_manifest_output_files
+from .cache import (
+    SiteFingerprints,
+    compute_fingerprints,
+    fingerprints_from_cache,
+    load_cache,
+    prune_stale_outputs,
+    save_cache,
+)
 from .config import ensure_safe_output_dir, load_config
 from .discovery import discover_content
 from .errors import (
@@ -31,6 +41,7 @@ from .models import (
 from .page_builder import build_page, warn_collection_slug_collisions
 from .renderer import render_site, validate_page_layouts
 from .site_model import build_site_model, dedupe_pages_by_url, generate_derived_pages
+from .sitemap import write_sitemap
 from .writer import clean_output_dir, write_pages
 
 logger = logging.getLogger("ssg.build")
@@ -45,12 +56,14 @@ class SiteBuilder:
         clean_output: bool | None = None,
         output_dir: str | Path | None = None,
         continue_on_error: bool = False,
+        incremental: bool | None = None,
     ) -> None:
         self.config_path = Path(config_path)
         self.include_drafts = include_drafts
         self.clean_output = clean_output
         self.output_dir_override = Path(output_dir) if output_dir else None
         self.continue_on_error = continue_on_error
+        self.incremental = incremental
         self._converter: MarkdownConverter | None = None
 
     def build(self) -> BuildResult:
@@ -61,11 +74,15 @@ class SiteBuilder:
         warnings: list[str] = []
         errors: list[str] = []
         failed_page_keys: set[str] = set()
+        previous_output_files = read_manifest_output_files(config) if config.incremental else []
+        previous_cache = load_cache(config) if config.incremental else None
+        previous_fingerprints = fingerprints_from_cache(previous_cache) if previous_cache else None
+        fingerprints = compute_fingerprints(config, config_path=self.config_path)
 
         self._warn_missing_optional_dirs(config, warnings)
 
         self._log("clean")
-        self._prepare_output(config)
+        self._prepare_output(config, previous_fingerprints, fingerprints, warnings)
 
         self._log("discover")
         sources = discover_content(config)
@@ -82,10 +99,29 @@ class SiteBuilder:
 
         self._log("render/write/assets")
         rendered_pages, output_files, asset_files = self._render_and_emit(
-            config, site, errors, failed_page_keys
+            config,
+            site,
+            errors,
+            failed_page_keys,
+            previous_fingerprints=previous_fingerprints,
+            fingerprints=fingerprints,
         )
 
+        sitemap_path: Path | None = None
+        if config.generate_sitemap:
+            self._log("sitemap")
+            try:
+                sitemap_path = write_sitemap(config, site)
+            except OSError as exc:
+                error = OutputWriteError(str(exc), path=config.output_dir / "sitemap.xml")
+                if not self.continue_on_error:
+                    raise error from exc
+                self._record_error(error, errors, failed_page_keys, count_page_failure=False)
+
         generated_count = sum(1 for page in site.pages if page.generated)
+        emitted_files = list(output_files)
+        if sitemap_path is not None:
+            emitted_files.append(sitemap_path)
 
         manifest = self._build_manifest(
             config=config,
@@ -95,19 +131,46 @@ class SiteBuilder:
             rendered_pages=rendered_pages,
             drafts_skipped=drafts_skipped,
             generated_count=generated_count,
-            output_files=output_files,
+            output_files=emitted_files,
             asset_files=asset_files,
             site=site,
             errors=errors,
             failed_page_keys=failed_page_keys,
+            incremental=config.incremental,
+            extra_warnings=warnings,
         )
 
         self._log("manifest")
         manifest = self._write_manifest(config, manifest, errors, failed_page_keys)
+        current_output_files = set(manifest.output_files)
+        stale_removed = 0
+        if config.incremental and previous_output_files:
+            removed = prune_stale_outputs(
+                config,
+                previous_files=previous_output_files,
+                current_files=current_output_files,
+            )
+            stale_removed = len(removed)
+            if removed:
+                stale_warnings = [
+                    f"[incremental] removed stale output file: {path}" for path in removed
+                ]
+                manifest = dataclasses.replace(
+                    manifest,
+                    warnings=[*manifest.warnings, *stale_warnings],
+                    stale_files_removed=stale_removed,
+                )
+
+        save_cache(
+            config,
+            fingerprints=fingerprints,
+            output_files=manifest.output_files,
+        )
         manifest = dataclasses.replace(
             manifest,
             errors=list(errors),
             pages_failed=len(failed_page_keys),
+            stale_files_removed=stale_removed,
         )
 
         return BuildResult(
@@ -123,13 +186,25 @@ class SiteBuilder:
             self.config_path,
             include_drafts=self.include_drafts,
             clean_output=self.clean_output,
+            incremental=self.incremental,
         )
         if self.output_dir_override is not None:
             config = dataclasses.replace(config, output_dir=self.output_dir_override.resolve())
             ensure_safe_output_dir(config)
+        if config.incremental:
+            config = dataclasses.replace(config, clean_output=False)
         return config
 
-    def _prepare_output(self, config: SiteConfig) -> None:
+    def _prepare_output(
+        self,
+        config: SiteConfig,
+        previous_fingerprints: SiteFingerprints | None,
+        fingerprints: SiteFingerprints,
+        warnings: list[str],
+    ) -> None:
+        if config.incremental and previous_fingerprints is not None:
+            if previous_fingerprints.global_deps_changed(fingerprints):
+                warnings.append("[incremental] global dependencies changed; rebuilding all pages")
         if config.clean_output:
             clean_output_dir(config)
         else:
@@ -217,6 +292,9 @@ class SiteBuilder:
         site: SiteModel,
         errors: list[str],
         failed_page_keys: set[str],
+        *,
+        previous_fingerprints: SiteFingerprints | None,
+        fingerprints: SiteFingerprints,
     ) -> tuple[list[RenderedPage], list[Path], list[Path]]:
         if self.continue_on_error:
             rendered_pages = render_site(site, errors=errors, failed_page_keys=failed_page_keys)
@@ -230,7 +308,14 @@ class SiteBuilder:
             rendered_pages = render_site(site)
             output_files = write_pages(config, rendered_pages)
         try:
-            asset_files = copy_assets(config)
+            asset_files = copy_assets(
+                config,
+                skip_if_unchanged=config.incremental,
+                previous_static_hash=(
+                    previous_fingerprints.static if previous_fingerprints else None
+                ),
+                current_static_hash=fingerprints.static,
+            )
         except AssetCopyError as exc:
             if not self.continue_on_error:
                 raise
@@ -285,6 +370,8 @@ class SiteBuilder:
         site: SiteModel,
         errors: list[str],
         failed_page_keys: set[str],
+        incremental: bool,
+        extra_warnings: list[str],
     ) -> BuildManifest:
         finished = datetime.now(timezone.utc)
         output_file_names = [
@@ -302,9 +389,10 @@ class SiteBuilder:
             pages_failed=len(failed_page_keys),
             generated_pages=generated_count,
             assets_copied=len(asset_files),
-            warnings=list(site.warnings),
+            warnings=[*site.warnings, *extra_warnings],
             errors=list(errors),
             output_files=output_file_names,
+            incremental=incremental,
         )
 
     def _warn_missing_optional_dirs(self, config: SiteConfig, warnings: list[str]) -> None:
