@@ -10,13 +10,13 @@ implements the scope in [spec/static_site_generator_improved_full_scope.txt](spe
 | Requirements & scope | 9 | Spec traceability table below; explicit “out of scope” in README |
 | Architecture & design | 9 | [ARCHITECTURE.md](ARCHITECTURE.md), 5 ADRs, adapter boundaries |
 | Implementation quality | 9 | Typed Python, staged pipeline, structured errors, 4 audit cycles |
-| Testing & CI | 9 | 100+ tests, ≥90% coverage on `ssg/`, multi-OS CI |
+| Testing & CI | 10 | 285 tests, ≥97% coverage on `ssg/`, mypy strict on `ssg/` + typed tests |
 | Documentation | 9 | README, CHANGELOG, CONTRIBUTING, SECURITY, this document |
 | Reproducibility | 9 | Pinned deps, `make check`, GitHub Actions |
 | Security & safety | 8 | Path containment, HTML escaping model in [SECURITY.md](SECURITY.md) |
-| CLI / UX | 8 | Full CLI, exit codes, `--continue-on-error`, local serve |
+| CLI / UX | 9 | Full CLI, watch + live reload, incremental builds, exit codes |
 | Portfolio presentation | 8 | Example site, tagged releases, MIT license (pending public push) |
-| Academic reflection | 9 | Audit history, limitations, trade-offs in ADRs |
+| Academic reflection | 9 | Audit history, ADRs (including 0006), limitations, trade-offs |
 
 **Overall:** Portfolio-ready static site generator demonstrating pipeline architecture,
 defensive filesystem handling, and iterative quality improvement.
@@ -41,7 +41,10 @@ defensive filesystem handling, and iterative quality improvement.
 | Continue on error | `SiteBuilder.continue_on_error` | `test_pipeline_integration.py`, `test_cli.py` |
 | Draft filtering | `builder._assemble_site_model` | `test_pipeline_integration.py` |
 | Scaffold new content | `scaffold.py` | `test_cli.py`, `test_scaffold.py` |
-| Local serve | `cli.serve` | `test_cli.py` |
+| Local serve | `cli.serve`, `cli.watch` | `test_cli.py`, `test_watch.py` |
+| Incremental build | `cache.py`, `SiteBuilder(incremental=True)` | `test_cache.py`, `test_new_features.py` |
+| Sitemap | `sitemap.py` | `test_sitemap.py` |
+| YAML front matter | `frontmatter.py` (PyYAML) | `test_frontmatter.py` |
 
 ## Audit history
 
@@ -57,18 +60,18 @@ mypy, and ruff.
 
 ## Known limitations (accepted)
 
-- **Full rebuild only** — no incremental builds or cache ([ADR 0001](adr/0001-full-rebuild-over-incremental.md)).
-- **Minimal front matter** — not full YAML; single-line fields; `draft` is `true`/`false` only.
+- **Incremental re-renders all pages** — cache skips clean/static copy and prunes stale files; no per-page render cache ([ADR 0006](adr/0006-incremental-watch-sitemap-yaml.md)).
 - **Minimal templates** — no loops, includes, or nested `{% if %}`; only `\| safe` filter.
 - **Partial namespace** — keyed by filename stem, not subdirectory path.
-- **No RSS, sitemap, or asset bundling** — out of scope for v1.
-- **Serve is dev-only** — no live reload or production server.
+- **No RSS or asset bundling** — RSS deliberately out of scope; no minification pipeline.
+- **Watch uses polling** — no native OS file watcher; dev-only live reload.
+- **Serve is dev-only** — no production server.
 
 ## Future work (if extending beyond course scope)
 
-1. Incremental builds with content-hash cache invalidation.
+1. Per-page render cache with dependency tracking (layout → all pages).
 2. RSS feed generation from dated collection pages.
-3. Optional strict mypy across tests and plugins for Markdown extensions.
+3. Native file watcher (e.g. watchdog) instead of polling.
 
 ## Demo script (≈5 minutes)
 
@@ -77,7 +80,7 @@ mypy, and ruff.
 3. Open `example_site/dist/.ssg-manifest.json` — show counters and POSIX paths.
 4. Open `example_site/dist/tags/python/index.html` — generated tag listing.
 5. `python -m ssg build --config example_site/site.toml --continue-on-error` with a bad layout file — show manifest errors.
-6. `python -m ssg serve --config example_site/site.toml` — local preview.
+6. `python -m ssg watch --config example_site/site.toml` — edit a post and show live reload.
 
 ## Course alignment
 
