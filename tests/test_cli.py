@@ -1,3 +1,5 @@
+""" Test CLI """
+
 from __future__ import annotations
 
 import pytest
@@ -276,3 +278,74 @@ def test_cli_build_internal_error_returns_exit_code_three(site_root, monkeypatch
     monkeypatch.setattr("ssg.cli.SiteBuilder", boom)
 
     assert main(["build", "--config", str(site_root / "site.toml")]) == 3
+
+
+def test_cli_clean_removes_output(site_root):
+    from ssg.builder import SiteBuilder
+
+    SiteBuilder(site_root / "site.toml").build()
+    assert (site_root / "dist" / "index.html").exists()
+
+    assert main(["clean", "--config", str(site_root / "site.toml")]) == 0
+
+    assert not (site_root / "dist").exists()
+
+
+def test_cli_print_build_summary_with_errors(site_root, capsys):
+    from ssg.builder import SiteBuilder
+    from ssg.cli import print_build_summary
+
+    (site_root / "content" / "bad.md").write_text(
+        "---\ntitle: Bad\nlayout: nope.html\ndraft: false\n---\n# x\n",
+        encoding="utf-8",
+    )
+    result = SiteBuilder(site_root / "site.toml", continue_on_error=True).build()
+    print_build_summary(result)
+    captured = capsys.readouterr()
+
+    assert "Build finished with errors." in captured.out
+    assert "errors:" in captured.out
+
+
+def test_cli_serve_bind_error(site_root, monkeypatch):
+    import ssg.cli as cli_module
+    from ssg.builder import SiteBuilder
+
+    SiteBuilder(site_root / "site.toml").build()
+
+    def fail_bind(*args, **kwargs):
+        raise OSError("address in use")
+
+    monkeypatch.setattr(cli_module, "ThreadingHTTPServer", fail_bind)
+
+    assert main(["serve", "--config", str(site_root / "site.toml"), "--port", "8000"]) == 2
+
+
+def test_cli_serve_keyboard_interrupt(site_root, monkeypatch):
+    import ssg.cli as cli_module
+    from ssg.builder import SiteBuilder
+
+    SiteBuilder(site_root / "site.toml").build()
+
+    class InterruptServer:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def serve_forever(self) -> None:
+            raise KeyboardInterrupt
+
+        def server_close(self) -> None:
+            pass
+
+    monkeypatch.setattr(cli_module, "ThreadingHTTPServer", InterruptServer)
+
+    assert cli_module.serve(str(site_root / "site.toml"), "127.0.0.1", 8765) == 0
+
+
+def test_cli_configure_logging_quiet():
+    from ssg.cli import _configure_logging
+    import logging
+
+    _configure_logging(verbose=False, quiet=True)
+
+    assert logging.getLogger().level == logging.ERROR
