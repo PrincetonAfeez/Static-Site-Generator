@@ -36,7 +36,9 @@ jobs:
           ruff format --check ssg tests
 
       - name: Run mypy
-        run: mypy ssg
+        run: |
+          mypy ssg
+          mypy tests --explicit-package-bases
 
       - name: Run pytest with coverage
-        run: pytest --cov=ssg --cov-report=term-missing --cov-fail-under=90
+        run: pytest --cov=ssg --cov-report=term-missing --cov-fail-under=97
