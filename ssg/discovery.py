@@ -1,3 +1,5 @@
+""" Static Site Generator Discovery """
+
 from __future__ import annotations
 
 from pathlib import Path
