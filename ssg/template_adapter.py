@@ -1,3 +1,5 @@
+""" Static Site Generator Template Adapter """
+
 from __future__ import annotations
 
 import html
