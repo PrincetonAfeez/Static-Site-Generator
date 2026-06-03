@@ -1,3 +1,5 @@
+""" Static Site Generator Config """
+
 from __future__ import annotations
 
 import dataclasses
@@ -19,6 +21,7 @@ def load_config(
     *,
     include_drafts: bool | None = None,
     clean_output: bool | None = None,
+    incremental: bool | None = None,
 ) -> SiteConfig:
     path = Path(config_path)
     if not path.exists():
@@ -48,6 +51,8 @@ def load_config(
         permalink=str(data.get("permalink", "/{path}/{slug}/")),
         include_drafts=bool(build_data.get("drafts", False)),
         clean_output=bool(build_data.get("clean", True)),
+        incremental=bool(build_data.get("incremental", False)),
+        generate_sitemap=bool(build_data.get("sitemap", True)),
         post_collections=_string_tuple(
             scaffold_data.get("post_collections", ["blog"]),
             field_name="post_collections",
@@ -60,6 +65,8 @@ def load_config(
         config = dataclasses.replace(config, include_drafts=include_drafts)
     if clean_output is not None:
         config = dataclasses.replace(config, clean_output=clean_output)
+    if incremental is not None:
+        config = dataclasses.replace(config, incremental=incremental)
 
     validate_config(config)
     return config
