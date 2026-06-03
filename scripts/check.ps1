@@ -12,8 +12,9 @@ ruff format --check ssg tests
 
 Write-Host "==> mypy"
 mypy ssg
+mypy tests --explicit-package-bases
 
 Write-Host "==> pytest with coverage"
-pytest --cov=ssg --cov-report=term-missing --cov-fail-under=90
+pytest --cov=ssg --cov-report=term-missing --cov-fail-under=97
 
 Write-Host "All checks passed."
