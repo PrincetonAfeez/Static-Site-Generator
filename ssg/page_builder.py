@@ -1,3 +1,5 @@
+""" Static Site Generator Page Builder """
+
 from __future__ import annotations
 
 import re
