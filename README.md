@@ -1,6 +1,6 @@
 # Static Site Generator
 
-[![tests](https://github.com/princ/static-site-generator/actions/workflows/test.yml/badge.svg)](https://github.com/princ/static-site-generator/actions/workflows/test.yml)
+[![tests](https://github.com/PrincetonAfeez/Static-Site-Generator/actions/workflows/test.yml/badge.svg)](https://github.com/PrincetonAfeez/Static-Site-Generator/actions/workflows/test.yml)
 
 A small Python static site generator that reads Markdown files with simple front
 matter, converts them to HTML, applies layouts through a template adapter, and
@@ -14,10 +14,10 @@ database, admin UI, or live rebuild server.
 ```powershell
 pip install -r requirements-dev.txt -e .
 python -m ssg build --config example_site/site.toml
-python -m ssg serve --config example_site/site.toml
+python -m ssg watch --config example_site/site.toml
 ```
 
-Open `http://127.0.0.1:8000` — browse Home, About, blog posts, and tag pages.
+Open `http://127.0.0.1:8000` while `ssg watch` runs — browse Home, About, blog posts, and tag pages.
 Build with `--drafts` to include `draft-post.md`.
 
 ## Installation
@@ -28,8 +28,8 @@ Requires Python 3.11+.
 pip install -e .
 ```
 
-That installs the `ssg` package and its single runtime dependency
-(`Markdown>=3.0`). For running the test suite, include the optional extra:
+That installs the `ssg` package and its runtime dependencies
+(`Markdown>=3.0`, `PyYAML>=6.0`). For running the test suite, include the optional extra:
 
 ```powershell
 pip install -e ".[test]"
@@ -84,6 +84,12 @@ Continue past per-page errors instead of aborting:
 python -m ssg build --config example_site/site.toml --continue-on-error
 ```
 
+Incremental build (skip cleaning `dist/`, prune stale outputs, skip unchanged static assets):
+
+```powershell
+python -m ssg build --config example_site/site.toml --incremental
+```
+
 Override the output directory for one build:
 
 ```powershell
@@ -106,6 +112,18 @@ Serve the built site locally (no rebuild on save):
 
 ```powershell
 python -m ssg serve --config example_site/site.toml --host 127.0.0.1 --port 8000
+```
+
+Serve with browser live reload (polls for rebuilds from `ssg watch`):
+
+```powershell
+python -m ssg serve --config example_site/site.toml --live-reload
+```
+
+Watch content, layouts, and static files; rebuild incrementally and serve with live reload:
+
+```powershell
+python -m ssg watch --config example_site/site.toml
 ```
 
 Print stage-level progress while building (`--verbose` sets logging to INFO so
@@ -146,7 +164,8 @@ python -m ssg build --config example_site/site.toml --quiet
 12. Render layouts
 13. Write HTML files
 14. Copy static assets
-15. Write `.ssg-manifest.json`
+15. Write `sitemap.xml` (when enabled)
+16. Write `.ssg-manifest.json`
 
 ## Content
 
@@ -166,17 +185,32 @@ draft: false
 This is Markdown content.
 ```
 
-Front matter is a small YAML-like key-value format. It is intentionally not full
-YAML. Supported fields are `title`, `date`, `tags`, `layout`, `draft`, `slug`,
+Front matter uses **YAML** (via PyYAML). Supported fields are `title`, `date`, `tags`, `layout`, `draft`, `slug`,
 `description`, and `author`. Unknown fields are kept in `page.metadata` and
 surface as build warnings — your templates can still read them via
 `{{ page.metadata.<field> }}`.
 
-Limitations:
+Examples:
 
-- One line per field (no multiline values)
-- `draft` accepts only `true` or `false` (not `yes`/`no`)
-- `tags` are normalized to lowercase and split on commas
+```yaml
+---
+title: My First Post
+date: 2026-05-26
+tags:
+  - python
+  - static-sites
+layout: post.html
+draft: false
+description: |
+  A multiline description
+  is supported.
+---
+```
+
+Notes:
+
+- `draft` accepts `true`/`false`, `yes`/`no`, or YAML booleans
+- `tags` accept a comma-separated string or YAML list (normalized to lowercase)
 
 ## Templates
 
@@ -261,6 +295,8 @@ permalink = "/{path}/{slug}/"
 [build]
 drafts = false
 clean = true
+incremental = false
+sitemap = true
 
 [scaffold]
 post_collections = ["blog"]
@@ -278,7 +314,12 @@ the build continues with a warning (empty partials or no copied assets).
 
 ## Build manifest
 
-Each build writes `.ssg-manifest.json` to the output directory. The manifest
+Each build writes `.ssg-manifest.json` to the output directory. Incremental builds
+also write `.ssg-cache.json` with content hashes for cache invalidation. When
+`sitemap = true` (default), the build also writes `sitemap.xml` with absolute
+URLs from `base_url`.
+
+The manifest
 includes `schema_version` (currently `1`), timing, page counts, warnings,
 errors, and a POSIX-formatted list of output files. The manifest file itself is
 included in `output_files` only after a successful write. The `pages_failed`
@@ -297,12 +338,13 @@ error strings). Pre-page parse failures appear only in `errors`.
 | [Project spec](docs/spec/static_site_generator_improved_full_scope.txt) | Canonical scope |
 
 This project implements the improved full scope spec; it deliberately does **not**
-implement incremental builds, RSS, sitemap generation, or a full YAML front matter parser.
+implement RSS feeds or asset bundling/minification.
 
 ## Development
 
 Static type checking runs on the `ssg/` package with **mypy strict mode**.
-Tests enforce **≥90% line coverage** on `ssg/`. Run the full gate:
+Tests are type-checked with mypy using relaxed untyped-call rules.
+Tests enforce **≥97% line coverage** on `ssg/` (285 tests). Run the full gate:
 
 ```powershell
 .\scripts\check.ps1
@@ -315,7 +357,8 @@ pip install -r requirements-dev.txt -e .
 ruff check ssg tests
 ruff format --check ssg tests
 mypy ssg
-pytest --cov=ssg --cov-fail-under=90
+mypy tests --explicit-package-bases
+pytest --cov=ssg --cov-fail-under=97
 ```
 
 CI runs the same checks on Ubuntu and Windows with Python 3.11, 3.12, and 3.13.
@@ -324,10 +367,10 @@ CI runs the same checks on Ubuntu and Windows with Python 3.11, 3.12, and 3.13.
 
 Implemented:
 
-- Library core and CLI (`build`, `clean`, `new`, `serve`)
-- Clean full rebuild
+- Library core and CLI (`build`, `clean`, `new`, `serve`, `watch`)
+- Clean full rebuild (default) or incremental rebuild with content-hash cache
 - Markdown adapter
-- Front matter parser with unknown-field warnings
+- YAML front matter parser with unknown-field warnings
 - Page and Site models
 - Configurable permalink template
 - Tag grouping and generated tag pages
@@ -339,13 +382,10 @@ Implemented:
 - Build manifest with warnings and errors
 - Safety-checked output cleaning
 - Continue-on-error mode
+- Sitemap generation (`sitemap.xml`)
+- Watch mode with live browser reload during local preview
 
 Out of scope:
 
-- Incremental builds
-- Watch mode
-- Live reload
-- RSS
-- Sitemap
-- Asset bundling
-- Full YAML parsing
+- RSS feeds
+- Asset bundling / minification
