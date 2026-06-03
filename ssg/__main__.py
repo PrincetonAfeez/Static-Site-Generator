@@ -1,3 +1,5 @@
+""" Static Site Generator CLI """
+
 from .cli import main
 
 
