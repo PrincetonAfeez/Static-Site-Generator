@@ -1,4 +1,4 @@
-# ADR 0001: Full Rebuild Over Incremental Builds
+# ADR 0001: Full Rebuild Over Incremental Builds 
 
 ## Status
 
