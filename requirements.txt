@@ -2,3 +2,4 @@
 # Floor pin lives in pyproject.toml; this file pins the exact versions
 # used by CI so a re-run six months from now resolves identically.
 Markdown==3.10.2
+PyYAML==6.0.2
