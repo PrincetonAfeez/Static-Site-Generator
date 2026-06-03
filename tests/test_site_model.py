@@ -1,3 +1,5 @@
+""" Test Site Model """
+
 from __future__ import annotations
 
 import pytest
@@ -168,3 +170,19 @@ def test_tag_slug_collision_skips_second_page(site_root):
     assert generated[0].url == "/tags/foo-bar/"
     assert any("foo-bar" in warning for warning in warnings)
     build_site_model(config, [first, second, *generated], warnings=warnings)
+
+
+def test_generate_collection_pages_skips_taken_url(site_root):
+    from pathlib import Path
+
+    config = load_config(site_root / "site.toml")
+    blog_index = make_page(config, url="/blog/", title="Blog", collection="blog")
+    blog_index.relative_source_path = Path("blog/index.md")
+    post = make_page(config, url="/blog/post/", title="Post", collection="blog")
+    post.relative_source_path = Path("blog/post.md")
+    warnings: list[str] = []
+
+    pages = generate_derived_pages(config, [blog_index, post], warnings)
+
+    assert not any(page.generated and page.url == "/blog/" for page in pages)
+    assert any("collection page" in warning and "already taken" in warning for warning in warnings)
