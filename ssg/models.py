@@ -1,3 +1,5 @@
+""" Static Site Generator Models """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,6 +21,8 @@ class SiteConfig:
     permalink: str
     include_drafts: bool = False
     clean_output: bool = True
+    incremental: bool = False
+    generate_sitemap: bool = True
     post_collections: tuple[str, ...] = ()
     assets_dir: str = "assets"
 
@@ -99,6 +103,8 @@ class BuildManifest:
     warnings: list[str]
     errors: list[str]
     output_files: list[str]
+    incremental: bool = False
+    stale_files_removed: int = 0
 
 
 @dataclass(frozen=True, eq=False)
