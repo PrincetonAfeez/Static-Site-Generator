@@ -14,9 +14,10 @@ format-check:
 
 typecheck:
 	mypy ssg
+	mypy tests --explicit-package-bases
 
 coverage:
-	pytest --cov=ssg --cov-report=term-missing --cov-fail-under=90
+	pytest --cov=ssg --cov-report=term-missing --cov-fail-under=97
 
 test:
 	pytest -v
