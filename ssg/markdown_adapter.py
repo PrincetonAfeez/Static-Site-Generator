@@ -1,3 +1,5 @@
+""" Static Site Generator Markdown Adapter """
+
 from __future__ import annotations
 
 from .errors import MarkdownConversionError
