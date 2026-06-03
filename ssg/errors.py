@@ -1,3 +1,5 @@
+""" Static Site Generator Errors """
+
 from __future__ import annotations
 
 from pathlib import Path
