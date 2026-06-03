@@ -1,3 +1,5 @@
+""" Test Pipeline Integration """
+
 from __future__ import annotations
 
 import shutil
@@ -156,7 +158,7 @@ def test_pipeline_warns_when_partial_dir_missing(site_root):
 def test_pipeline_continue_on_error_survives_asset_copy_failure(site_root, monkeypatch):
     from ssg.errors import AssetCopyError
 
-    def fail_copy(_config):
+    def fail_copy(_config, **kwargs):
         raise AssetCopyError("disk full", path=site_root / "static")
 
     monkeypatch.setattr("ssg.builder.copy_assets", fail_copy)
