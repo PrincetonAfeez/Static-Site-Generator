@@ -1,3 +1,5 @@
+""" Test Template Adapter """
+
 from __future__ import annotations
 
 from ssg.template_adapter import TemplateRenderer
