@@ -19,8 +19,8 @@ Do **not** implement:
 - Database-backed content or user accounts
 - Browser-based authoring or admin panels
 
-Optional **local preview** is limited to `ssg serve` — a thin wrapper around
-`http.server` for development.
+Optional **local preview** is limited to CLI commands such as `ssg serve` and
+`ssg watch` (see ADR 0006) — thin development helpers, not a production web layer.
 
 ## Alternatives considered
 
@@ -29,6 +29,12 @@ Optional **local preview** is limited to `ssg serve` — a thin wrapper around
 | Django admin for content | Out of scope; shifts focus to web app development. |
 | Live rebuild on save | Requires watch process; deferred to future work. |
 | Headless CMS integration | External service; not required for core pipeline demonstration. |
+
+Historical note: At the time of ADR 0004, live rebuild on save was deferred. ADR 0006
+later introduced local-only `ssg watch` with polling, debounced rebuilds, optional
+preview serving, and browser live reload. This does not change the no-web-layer
+decision because watch mode remains a local development CLI feature, not a
+production web application.
 
 ## Consequences
 
@@ -41,9 +47,10 @@ Optional **local preview** is limited to `ssg serve` — a thin wrapper around
 **Negative**
 
 - No in-browser editing; authors use Markdown files and `ssg new`.
-- Preview requires manual rebuild before refresh (unless browser hard-refreshes static files).
+- Without `ssg watch`, preview requires manual rebuild before refresh.
 
 ## References
 
 - README “Scope” section
-- `ssg/cli.py` — `serve` command
+- `ssg/cli.py` — `serve` and `watch` commands
+- [ADR 0006](0006-incremental-watch-sitemap-yaml.md) — local watch mode and live reload

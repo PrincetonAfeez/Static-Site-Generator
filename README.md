@@ -6,8 +6,9 @@ A small Python static site generator that reads Markdown files with simple front
 matter, converts them to HTML, applies layouts through a template adapter, and
 writes static files to `dist/`.
 
-The project is a library plus CLI. There is no Django layer, HTMX layer,
-database, admin UI, or live rebuild server.
+The project is a library plus CLI. It has a local development preview/watch
+mode, but it does not provide a Django layer, HTMX layer, database, admin UI,
+hosted CMS, or production live-rebuild service.
 
 ## Demo in 60 seconds
 
@@ -138,6 +139,16 @@ Suppress non-error output (overrides `--verbose`):
 ```powershell
 python -m ssg build --config example_site/site.toml --quiet
 ```
+
+## Stopping long-running commands
+
+`ssg serve` and `ssg watch` run until interrupted.
+
+Press `Ctrl+C` to stop them.
+
+- `ssg serve` shuts down the local preview server and returns exit code 0.
+- `ssg watch` stops watching and returns the most recent build result: 0 if the
+  latest build succeeded, 1 if the latest build completed with build errors.
 
 ## Exit codes
 
@@ -326,6 +337,56 @@ included in `output_files` only after a successful write. The `pages_failed`
 counter reflects distinct failed page URLs (not asset/manifest failures or raw
 error strings). Pre-page parse failures appear only in `errors`.
 
+## Manifest and cache schema evolution
+
+`.ssg-manifest.json` includes `schema_version`.
+
+Compatibility policy:
+
+- Consumers should check `schema_version` before relying on manifest fields.
+- Minor project releases may add fields without changing existing field meanings.
+- Breaking manifest shape changes must increment `schema_version`.
+- `.ssg-cache.json` is an internal optimization file and may be safely deleted.
+- If the cache format changes, the builder should ignore or rebuild stale cache data rather than failing the build.
+
+## Observability
+
+This project is a local build tool. Observability is provided through:
+
+- CLI summaries.
+- `--verbose` stage-level logging.
+- `.ssg-manifest.json` with timing, page counts, warnings, errors, and output files.
+
+Structured service telemetry such as JSON logs, metrics exporters, and distributed
+tracing is intentionally out of scope because the project is not a hosted service.
+
+## Deployment
+
+This project does not deploy sites automatically. It generates static files that can
+be uploaded to any static host.
+
+Basic deployment workflow:
+
+```powershell
+python -m ssg build --config example_site/site.toml
+```
+
+Then deploy the generated `dist/` directory to a static host such as:
+
+- GitHub Pages
+- Netlify
+- Cloudflare Pages
+- S3/static website hosting
+- nginx serving a static directory
+
+Example GitHub Pages approach:
+
+1. Build the site.
+2. Copy the contents of `dist/` to the branch or folder used by GitHub Pages.
+3. Push the generated static files.
+
+Security note: Do not use `ssg serve` as a production server. It is for local preview only.
+
 ## Documentation
 
 | Document | Purpose |
@@ -362,6 +423,31 @@ pytest --cov=ssg --cov-fail-under=97
 ```
 
 CI runs the same checks on Ubuntu and Windows with Python 3.11, 3.12, and 3.13.
+
+## Limits
+
+This project is intended for academic / portfolio-scale static sites.
+
+Expected use:
+
+- Tens to low hundreds of Markdown pages.
+- Local, single-user builds.
+- Local preview on `127.0.0.1`.
+- Polling-based watch mode for development.
+
+Not designed for:
+
+- Tens of thousands of pages.
+- Concurrent multi-user authoring.
+- Production HTTP serving.
+- Untrusted template or content authors.
+- Native OS-level file watching.
+- Large binary asset processing, bundling, or minification.
+
+Concurrency:
+
+- `ssg watch` uses one polling loop and, when serving, one background preview-server thread.
+- `ssg serve` uses Python's ThreadingHTTPServer for local preview only.
 
 ## Scope
 

@@ -60,6 +60,10 @@ mypy, and ruff.
 
 ## Known limitations (accepted)
 
+See also the consolidated [Limits](../README.md#limits) section in the README for
+scale, concurrency, and local-server expectations, and [Observability](../README.md#observability)
+for the local-tool logging and telemetry boundary.
+
 - **Incremental re-renders all pages** — cache skips clean/static copy and prunes stale files; no per-page render cache ([ADR 0006](adr/0006-incremental-watch-sitemap-yaml.md)).
 - **Minimal templates** — no loops, includes, or nested `{% if %}`; only `\| safe` filter.
 - **Partial namespace** — keyed by filename stem, not subdirectory path.

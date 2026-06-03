@@ -53,8 +53,9 @@ Stages run in order inside `SiteBuilder.build()`:
 | `assets.py` | Copy static files into the output assets directory. |
 | `manifest.py` | Serialize `BuildManifest` to JSON. |
 | `builder.py` | Orchestrate the pipeline; continue-on-error aggregation. |
-| `cli.py` | Argparse CLI: `build`, `clean`, `new`, `serve`. |
+| `cli.py` | Argparse CLI: `build`, `clean`, `new`, `serve`, `watch`. |
 | `scaffold.py` | Create new content files for `ssg new`. |
+| `watch.py` | Poll content/layout/static/config paths, debounce rebuilds, coordinate local preview live reload. |
 | `errors.py` | Typed exception hierarchy with stage and path metadata. |
 | `models.py` | Dataclasses: `SiteConfig`, `Page`, `SiteModel`, `BuildManifest`, etc. |
 

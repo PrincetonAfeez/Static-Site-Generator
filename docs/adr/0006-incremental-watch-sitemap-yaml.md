@@ -43,6 +43,19 @@ Upgrade front matter parsing to **YAML** via PyYAML.
 - Watch mode uses polling, not native OS file events.
 - PyYAML adds a runtime dependency and increases front matter parser complexity.
 
+## Concurrency and cancellation risks
+
+`ssg watch` uses a polling loop plus an optional daemon thread for the local preview
+server. Shared reload state is protected by `threading.Lock`.
+
+Accepted risks:
+
+- The polling loop may delay change detection by the configured polling/debounce interval.
+- The background server thread is daemonized and is intended only for local development.
+- The watch process exits through `KeyboardInterrupt`; there is no external cancellation API.
+- The reload-state lock is intentionally small and only guards an integer version counter, limiting deadlock risk.
+- Starvation risk is low for the intended local-development workload, but very large sites may spend most time rebuilding.
+
 ## References
 
 - [ADR 0001](0001-full-rebuild-over-incremental.md)
